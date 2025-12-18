@@ -32,7 +32,9 @@ export default async function CourseTimeWindowsPage({
 
 	const { data } = await supabase
 		.from('courses')
-		.select('id, title, subject, grade_range, description')
+		.select(
+			'id, title, subject, grade_range, description, duration_minutes, capacity, image_url, is_time_fixed, weeks'
+		)
 		.eq('id', id) // ✅ params.id 대신 id
 		.single();
 
@@ -69,7 +71,12 @@ export default async function CourseTimeWindowsPage({
 				<CardHeader>
 					<CardTitle>시간 추가</CardTitle>
 				</CardHeader>
-				<CardContent>
+				<CardContent className='space-y-3'>
+					{!course.is_time_fixed && (
+						<p className='rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800'>
+							이 수업은 시간 협의형으로 등록되어 있습니다. 시간을 추가하려면 먼저 수업을 시간 확정으로 설정해주세요.
+						</p>
+					)}
 					<form
 						action={createTimeWindow.bind(null, course.id)}
 						className='grid grid-cols-1 gap-3 md:grid-cols-4'>
@@ -80,13 +87,14 @@ export default async function CourseTimeWindowsPage({
 							<Select
 								name='day_of_week'
 								required
-								defaultValue='1'>
+								defaultValue='1'
+								disabled={!course.is_time_fixed}>
 								{days.map((label, idx) => (
 									<option
 										key={label}
 										value={idx}>
-										{label}
-									</option>
+											{label}
+										</option>
 								))}
 							</Select>
 						</div>
@@ -98,6 +106,7 @@ export default async function CourseTimeWindowsPage({
 								name='start_time'
 								type='time'
 								required
+								disabled={!course.is_time_fixed}
 							/>
 						</div>
 						<div>
@@ -108,10 +117,13 @@ export default async function CourseTimeWindowsPage({
 								name='end_time'
 								type='time'
 								required
+								disabled={!course.is_time_fixed}
 							/>
 						</div>
 						<div className='flex items-end'>
-							<Button type='submit'>추가</Button>
+							<Button type='submit' disabled={!course.is_time_fixed}>
+								추가
+							</Button>
 						</div>
 					</form>
 				</CardContent>

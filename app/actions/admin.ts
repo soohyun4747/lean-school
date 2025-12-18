@@ -6,6 +6,59 @@ import { requireSession, requireRole } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { runMatching } from '@/lib/matching';
 
+type TimeWindowInput = {
+	day_of_week: number;
+	start_time: string;
+	end_time: string;
+};
+
+const ALLOWED_WEEKS = [1, 2, 3, 4, 6, 8, 12];
+
+function parseTimeWindows(raw: string): TimeWindowInput[] {
+	if (!raw) return [];
+
+	try {
+		const parsed = JSON.parse(raw) as TimeWindowInput[];
+		return Array.isArray(parsed) ? parsed : [];
+	} catch (error) {
+		console.error('time window parse error', error);
+		return [];
+	}
+}
+
+function validateTimeWindows(windows: TimeWindowInput[]) {
+	windows.forEach((w) => {
+		if (
+			Number.isNaN(w.day_of_week) ||
+			w.day_of_week < 0 ||
+			w.day_of_week > 6
+		) {
+			throw new Error('요일 정보를 다시 확인해주세요.');
+		}
+
+		if (!w.start_time || !w.end_time) {
+			throw new Error('시작/종료 시간을 모두 입력해주세요.');
+		}
+
+		const [sHour, sMinute] = w.start_time.split(':').map(Number);
+		const [eHour, eMinute] = w.end_time.split(':').map(Number);
+		if (
+			Number.isNaN(sHour) ||
+			Number.isNaN(eHour) ||
+			Number.isNaN(sMinute) ||
+			Number.isNaN(eMinute)
+		) {
+			throw new Error('시간 형식을 다시 확인해주세요.');
+		}
+
+		const startMinutes = sHour * 60 + sMinute;
+		const endMinutes = eHour * 60 + eMinute;
+		if (startMinutes >= endMinutes) {
+			throw new Error('시작 시간은 종료 시간보다 이전이어야 합니다.');
+		}
+	});
+}
+
 export async function createCourse(formData: FormData) {
 	const { session, profile } = await requireSession();
 	requireRole(profile.role, ['admin']);
@@ -17,6 +70,11 @@ export async function createCourse(formData: FormData) {
 	const description = String(formData.get('description') ?? '').trim();
 	const capacity = Number(formData.get('capacity') ?? 4);
 	const duration = Number(formData.get('duration_minutes') ?? 60);
+	const isTimeFixed = String(formData.get('is_time_fixed') ?? 'false') === 'true';
+	const weeks = Number(formData.get('weeks') ?? 1);
+	const parsedWindows = parseTimeWindows(
+		String(formData.get('time_windows') ?? '')
+	);
 	const imageFile = formData.get('image');
 	let imageUrl: string | null = null;
 
@@ -24,8 +82,19 @@ export async function createCourse(formData: FormData) {
 		throw new Error('필수 항목을 모두 입력해주세요.');
 	}
 
+	if (!ALLOWED_WEEKS.includes(weeks)) {
+		throw new Error('과정 기간을 올바르게 선택해주세요.');
+	}
+
 	if (description && description.length > 800) {
 		throw new Error('설명은 800자 이내로 작성해주세요.');
+	}
+
+	if (isTimeFixed) {
+		if (parsedWindows.length === 0) {
+			throw new Error('고정 시간을 1개 이상 추가해주세요.');
+		}
+		validateTimeWindows(parsedWindows);
 	}
 
 	if (imageFile instanceof File && imageFile.size > 0) {
@@ -60,21 +129,46 @@ export async function createCourse(formData: FormData) {
 		imageUrl = data.publicUrl;
 	}
 
-	const { error } = await supabase.from('courses').insert({
-		title,
-		subject,
-		grade_range: gradeRange,
-		description: description || null,
-		capacity,
-		duration_minutes: duration,
-		image_url: imageUrl,
-		created_by: session.user.id, // (권장: 아래 참고)
-	});
+	const { data: newCourse, error } = await supabase
+		.from('courses')
+		.insert({
+			title,
+			subject,
+			grade_range: gradeRange,
+			description: description || null,
+			is_time_fixed: isTimeFixed,
+			weeks,
+			capacity,
+			duration_minutes: duration,
+			image_url: imageUrl,
+			created_by: session.user.id, // (권장: 아래 참고)
+		})
+		.select('id')
+		.single();
 
 	if (error) {
 		console.error('courses insert error:', error);
 		// ✅ Response 리턴 X, error 객체 통째로 전달 X
 		throw new Error(`Insert failed: ${error.message}`);
+	}
+
+	if (isTimeFixed && newCourse?.id) {
+		const timeWindows = parsedWindows.map((w) => ({
+			course_id: newCourse.id,
+			day_of_week: w.day_of_week,
+			start_time: w.start_time,
+			end_time: w.end_time,
+		}));
+
+		const { error: windowError } = await supabase
+			.from('course_time_windows')
+			.insert(timeWindows);
+
+		if (windowError) {
+			console.error('course time window insert error:', windowError);
+			await supabase.from('courses').delete().eq('id', newCourse.id);
+			throw new Error('수업 생성 중 시간이 저장되지 않았습니다. 다시 시도해주세요.');
+		}
 	}
 
 	revalidatePath('/admin/courses');
@@ -104,6 +198,16 @@ export async function createTimeWindow(courseId: string, formData: FormData) {
 	const dayOfWeek = Number(formData.get('day_of_week'));
 	const startTime = String(formData.get('start_time') ?? '');
 	const endTime = String(formData.get('end_time') ?? '');
+
+	const { data: course } = await supabase
+		.from('courses')
+		.select('is_time_fixed')
+		.eq('id', courseId)
+		.single();
+
+	if (!course?.is_time_fixed) {
+		throw new Error('시간 협의형 수업에는 고정 시간을 추가할 수 없습니다.');
+	}
 
 	if (Number.isNaN(dayOfWeek) || !startTime || !endTime) {
 		throw new Error('요일과 시간을 올바르게 입력해주세요.');

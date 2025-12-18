@@ -15,6 +15,8 @@ create table if not exists courses (
   subject text not null,
   grade_range text not null,
   description text,
+  is_time_fixed boolean not null default false,
+  weeks int not null default 1,
   duration_minutes int not null default 60,
   capacity int not null default 4,
   image_url text,

@@ -2,6 +2,12 @@ import type { Tables } from "@/types/database";
 
 export type TimeWindow = Tables<"course_time_windows">;
 
+export type DayTimeRange = {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
+
 export function generateSlotsFromWindows(
   windows: TimeWindow[],
   options: { days?: number; durationMinutes?: number; from?: Date } = {}
@@ -49,4 +55,58 @@ export function formatDateTime(date: Date) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getNextDateForDay(dayOfWeek: number, reference: Date, time: string) {
+  const [hour, minute] = time.split(":").map(Number);
+  const target = new Date(reference);
+  target.setHours(hour, minute, 0, 0);
+
+  const diff = (dayOfWeek + 7 - target.getDay()) % 7;
+  if (diff === 0 && target <= reference) {
+    target.setDate(target.getDate() + 7);
+  } else {
+    target.setDate(target.getDate() + diff);
+  }
+
+  return target;
+}
+
+export function buildSlotsFromDayTimeRanges(ranges: DayTimeRange[], options: { referenceDate?: Date } = {}) {
+  const reference = options.referenceDate ?? new Date();
+
+  return ranges
+    .map((range) => {
+      if (
+        Number.isNaN(range.day_of_week) ||
+        range.day_of_week < 0 ||
+        range.day_of_week > 6 ||
+        !range.start_time ||
+        !range.end_time
+      ) {
+        return null;
+      }
+
+      const [startHour, startMinute] = range.start_time.split(":").map(Number);
+      const [endHour, endMinute] = range.end_time.split(":").map(Number);
+      if (
+        Number.isNaN(startHour) ||
+        Number.isNaN(startMinute) ||
+        Number.isNaN(endHour) ||
+        Number.isNaN(endMinute)
+      ) {
+        return null;
+      }
+
+      const startAt = getNextDateForDay(range.day_of_week, reference, range.start_time);
+      const endAt = getNextDateForDay(range.day_of_week, reference, range.end_time);
+
+      if (startAt >= endAt) return null;
+
+      return {
+        start: startAt.toISOString(),
+        end: endAt.toISOString(),
+      };
+    })
+    .filter(Boolean) as { start: string; end: string }[];
 }

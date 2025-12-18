@@ -38,6 +38,8 @@ export interface Database {
           subject: string;
           grade_range: string;
           description: string | null;
+          is_time_fixed: boolean;
+          weeks: number;
           duration_minutes: number;
           capacity: number;
           image_url: string | null;
@@ -50,6 +52,8 @@ export interface Database {
           subject: string;
           grade_range: string;
           description?: string | null;
+          is_time_fixed?: boolean;
+          weeks?: number;
           duration_minutes?: number;
           capacity?: number;
           image_url?: string | null;
