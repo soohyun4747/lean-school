@@ -12,6 +12,7 @@ export interface ICourse {
 	title: string;
 	subject: string;
 	grade_range: string;
+	description: string | null;
 	capacity: number;
 	duration_minutes: number;
 	created_at: number;
@@ -25,7 +26,7 @@ export default async function AdminCoursesPage() {
 	const { data: courses } = await supabase
 		.from('courses')
 		.select(
-			'id, title, subject, grade_range, capacity, duration_minutes, created_at, image_url'
+			'id, title, subject, grade_range, description, capacity, duration_minutes, created_at, image_url'
 		)
 		.order('created_at', { ascending: false });
 
@@ -63,12 +64,26 @@ export default async function AdminCoursesPage() {
 							<label className='text-sm font-medium text-slate-700'>
 								학년 범위
 							</label>
-							<Input
-								name='grade_range'
-								placeholder='중1-중3'
-								required
-							/>
-						</div>
+						<Input
+							name='grade_range'
+							placeholder='중1-중3'
+							required
+						/>
+					</div>
+					<div className='md:col-span-2'>
+						<label className='text-sm font-medium text-slate-700'>
+							수업 소개
+						</label>
+						<textarea
+							name='description'
+							rows={3}
+							placeholder='수업 목표, 수업 방식 등 간단한 소개를 적어주세요.'
+							className='w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-[var(--primary)]'
+						/>
+						<p className='mt-1 text-xs text-slate-500'>
+							수업 목록과 학생 페이지에 표시됩니다.
+						</p>
+					</div>
 						<div>
 							<label className='text-sm font-medium text-slate-700'>
 								정원
@@ -143,19 +158,24 @@ export default async function AdminCoursesPage() {
 											</div>
 										)}
 									</div>
-									<div className='flex-1'>
-										<div className='flex items-start justify-between gap-2'>
-											<div>
-												<h3 className='text-base font-semibold text-slate-900'>
-													{course.title}
-												</h3>
-												<p className='text-sm text-slate-600'>
-													{course.subject} ·{' '}
-													{course.grade_range} ·{' '}
-													{course.duration_minutes}분
-													· 정원 {course.capacity}
-												</p>
-											</div>
+							<div className='flex-1'>
+								<div className='flex items-start justify-between gap-2'>
+									<div>
+										<h3 className='text-base font-semibold text-slate-900'>
+											{course.title}
+										</h3>
+										<p className='text-sm text-slate-600'>
+											{course.subject} ·{' '}
+											{course.grade_range} ·{' '}
+											{course.duration_minutes}분
+											· 정원 {course.capacity}
+										</p>
+										{course.description && (
+											<p className='mt-1 max-h-12 overflow-hidden text-xs text-slate-700'>
+												{course.description}
+											</p>
+										)}
+									</div>
 											<form action={deleteCourse.bind(null, course.id)}>
 												<Button
 													variant='ghost'

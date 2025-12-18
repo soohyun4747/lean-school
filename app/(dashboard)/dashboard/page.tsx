@@ -8,6 +8,8 @@ export default async function DashboardPage() {
   const shortcuts = {
     admin: [
       { href: "/admin/courses", label: "수업 관리" },
+      { href: "/admin/students", label: "학생 관리" },
+      { href: "/admin/instructors", label: "강사 관리" },
       { href: "/admin/matching", label: "자동 매칭" },
     ],
     student: [

@@ -14,6 +14,7 @@ create table if not exists courses (
   title text not null,
   subject text not null,
   grade_range text not null,
+  description text,
   duration_minutes int not null default 60,
   capacity int not null default 4,
   image_url text,

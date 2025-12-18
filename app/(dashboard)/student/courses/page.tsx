@@ -10,7 +10,7 @@ export default async function StudentCoursesPage() {
 
 	const { data: courses, error } = await supabase
 		.from('courses')
-		.select('id, title, subject, grade_range, capacity, image_url')
+		.select('id, title, subject, grade_range, description, capacity, image_url')
 		.order('created_at', { ascending: false });
 
 	if (error) {
@@ -47,15 +47,20 @@ export default async function StudentCoursesPage() {
 									</div>
 								)}
 							</div>
-							<div>
-								<h3 className='text-base font-semibold text-slate-900'>
-									{course.title}
-								</h3>
-								<p className='text-sm text-slate-600'>
-									{course.subject} · {course.grade_range} ·
-									정원 {course.capacity}
+						<div>
+							<h3 className='text-base font-semibold text-slate-900'>
+								{course.title}
+							</h3>
+							<p className='text-sm text-slate-600'>
+								{course.subject} · {course.grade_range} ·
+								정원 {course.capacity}
+							</p>
+							{course.description && (
+								<p className='mt-1 text-xs text-slate-700'>
+									{course.description}
 								</p>
-							</div>
+							)}
+						</div>
 							<div className='flex gap-2 text-sm'>
 								<Link
 									href={`/student/courses/${course.id}`}

@@ -22,7 +22,7 @@ export default async function StudentCourseDetail({
 	const { data } = await supabase
 		.from('courses')
 		.select(
-			'id, title, subject, grade_range, duration_minutes, capacity, image_url'
+			'id, title, subject, grade_range, description, duration_minutes, capacity, image_url'
 		)
 		.eq('id', id)
 		.single();
@@ -44,37 +44,46 @@ export default async function StudentCourseDetail({
 	console.log({ windows });
 
 	return (
-		<div className='space-y-4'>
-			<div className='overflow-hidden rounded-lg border border-[var(--primary-border)] bg-[var(--primary-soft)]'>
-				{course.image_url ? (
-					// eslint-disable-next-line @next/next/no-img-element
-					<img
-						src={course.image_url}
-						alt={`${course.title} 이미지`}
-						className='h-64 w-full object-cover'
-					/>
-				) : (
-					<div className='flex h-64 items-center justify-center text-sm font-semibold text-[var(--primary)]'>
-						대표 이미지가 아직 등록되지 않았어요
-					</div>
-				)}
-			</div>
-
-			<div className='flex items-center justify-between'>
-				<div>
-					<h1 className='text-xl font-semibold text-slate-900'>
-						{course.title}
-					</h1>
-					<p className='text-sm text-slate-600'>
-						{course.subject} · {course.grade_range} ·{' '}
-						{course.duration_minutes}분 · 정원 {course.capacity}
-					</p>
+		<div className='grid gap-6 lg:grid-cols-[1.1fr_0.9fr]'>
+			<div className='space-y-4'>
+				<div className='overflow-hidden rounded-lg border border-[var(--primary-border)] bg-[var(--primary-soft)]'>
+					{course.image_url ? (
+						// eslint-disable-next-line @next/next/no-img-element
+						<img
+							src={course.image_url}
+							alt={`${course.title} 이미지`}
+							className='h-64 w-full object-cover'
+						/>
+					) : (
+						<div className='flex h-64 items-center justify-center text-sm font-semibold text-[var(--primary)]'>
+							대표 이미지가 아직 등록되지 않았어요
+						</div>
+					)}
 				</div>
-				<Link
-					href={`/student/courses/${course.id}/apply`}
-					className='text-[var(--primary)] hover:underline'>
-					신청하기
-				</Link>
+
+				<div className='space-y-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm'>
+					<div className='flex items-start justify-between gap-3'>
+						<div>
+							<h1 className='text-xl font-semibold text-slate-900'>
+								{course.title}
+							</h1>
+							<p className='text-sm text-slate-600'>
+								{course.subject} · {course.grade_range} ·{' '}
+								{course.duration_minutes}분 · 정원 {course.capacity}
+							</p>
+						</div>
+						<Link
+							href={`/student/courses/${course.id}/apply`}
+							className='text-[var(--primary)] hover:underline'>
+							신청하기
+						</Link>
+					</div>
+					{course.description && (
+						<p className='text-sm text-slate-700'>
+							{course.description}
+						</p>
+					)}
+				</div>
 			</div>
 
 			<Card>

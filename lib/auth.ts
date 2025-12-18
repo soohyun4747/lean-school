@@ -17,7 +17,7 @@ export async function getSessionAndProfile() {
 		return { session: null, profile: null } as const;
 	}
 
-	const { data: profile, error } = await supabase
+	const { data: profile } = await supabase
 		.from('profiles')
 		.select('id, role, name, phone')
 		.eq('id', user.id)

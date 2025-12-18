@@ -14,6 +14,7 @@ export async function createCourse(formData: FormData) {
 	const title = String(formData.get('title') ?? '').trim();
 	const subject = String(formData.get('subject') ?? '').trim();
 	const gradeRange = String(formData.get('grade_range') ?? '').trim();
+	const description = String(formData.get('description') ?? '').trim();
 	const capacity = Number(formData.get('capacity') ?? 4);
 	const duration = Number(formData.get('duration_minutes') ?? 60);
 	const imageFile = formData.get('image');
@@ -21,6 +22,10 @@ export async function createCourse(formData: FormData) {
 
 	if (!title || !subject || !gradeRange) {
 		throw new Error('필수 항목을 모두 입력해주세요.');
+	}
+
+	if (description && description.length > 800) {
+		throw new Error('설명은 800자 이내로 작성해주세요.');
 	}
 
 	if (imageFile instanceof File && imageFile.size > 0) {
@@ -59,6 +64,7 @@ export async function createCourse(formData: FormData) {
 		title,
 		subject,
 		grade_range: gradeRange,
+		description: description || null,
 		capacity,
 		duration_minutes: duration,
 		image_url: imageUrl,
@@ -79,7 +85,7 @@ export async function deleteCourse(courseId: string) {
 	requireRole(profile.role, ['admin']);
 	const supabase = await getSupabaseServerClient();
 
-	const { data, error } = await supabase
+	const { error } = await supabase
 		.from('courses')
 		.delete()
 		.eq('id', courseId);

@@ -17,6 +17,7 @@ const roles = [
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState("student");
@@ -29,17 +30,37 @@ export default function SignupPage() {
     const supabase = getSupabaseBrowserClient();
     setError(null);
     setMessage(null);
-    const { error: signUpError } = await supabase.auth.signUp({
+    const trimmedPhone = phone.trim();
+
+    if (password !== confirmPassword) {
+      setError("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+      return;
+    }
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { role, name, phone },
+        data: { role, name, phone: trimmedPhone },
       },
     });
 
     if (signUpError) {
       setError(signUpError.message);
       return;
+    }
+
+    const userId = signUpData.user?.id;
+    if (userId && trimmedPhone && signUpData.session) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ phone: trimmedPhone, name, role })
+        .eq("id", userId);
+
+      if (profileError) {
+        setError("프로필 정보를 저장하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
     }
     setMessage("회원가입이 완료되었습니다. 로그인해 주세요.");
     router.push("/auth/login");
@@ -63,12 +84,27 @@ export default function SignupPage() {
               <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
             </div>
             <div>
+              <label className="text-sm font-medium text-slate-700">비밀번호 확인</label>
+              <Input
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                type="password"
+                required
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium text-slate-700">이름</label>
               <Input value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">연락처</label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="선택" />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="010-1234-5678"
+                type="tel"
+                required
+              />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">역할</label>

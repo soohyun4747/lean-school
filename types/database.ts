@@ -37,6 +37,7 @@ export interface Database {
           title: string;
           subject: string;
           grade_range: string;
+          description: string | null;
           duration_minutes: number;
           capacity: number;
           image_url: string | null;
@@ -48,6 +49,7 @@ export interface Database {
           title: string;
           subject: string;
           grade_range: string;
+          description?: string | null;
           duration_minutes?: number;
           capacity?: number;
           image_url?: string | null;
