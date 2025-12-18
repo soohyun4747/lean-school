@@ -26,12 +26,16 @@ export default async function AdminCoursesPage() {
 	const { profile } = await requireSession();
 	requireRole(profile.role, ['admin']);
 	const supabase = await getSupabaseServerClient();
-	const { data: courses } = await supabase
+	const { data: courses, error } = await supabase
 		.from('courses')
 		.select(
 			'id, title, subject, grade_range, description, capacity, duration_minutes, created_at, image_url, is_time_fixed, weeks'
 		)
 		.order('created_at', { ascending: false });
+
+	if (error) {
+		console.error(error);
+	}
 
 	return (
 		<div className='space-y-6'>
@@ -40,97 +44,97 @@ export default async function AdminCoursesPage() {
 					<CardTitle>수업 등록</CardTitle>
 				</CardHeader>
 				<CardContent>
-				<form
-					action={createCourse}
-					className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-					<div>
-						<label className='text-sm font-medium text-slate-700'>
-							수업명
-						</label>
-						<Input
-							name='title'
-							placeholder='예: 중등 수학 심화'
-							required
-						/>
-					</div>
-					<div>
-						<label className='text-sm font-medium text-slate-700'>
-							과목
-						</label>
-						<Input
-							name='subject'
-							placeholder='수학'
-							required
-						/>
-					</div>
-					<div>
-						<label className='text-sm font-medium text-slate-700'>
-							학년 범위
-						</label>
-						<Input
-							name='grade_range'
-							placeholder='중1-중3'
-							required
-						/>
-					</div>
-					<div>
-						<label className='text-sm font-medium text-slate-700'>
-							정원
-						</label>
-						<Input
-							name='capacity'
-							type='number'
-							min={1}
-							defaultValue={4}
-							required
-						/>
-					</div>
-					<div>
-						<label className='text-sm font-medium text-slate-700'>
-							수업 시간(분)
-						</label>
-						<Select
-							name='duration_minutes'
-							defaultValue='60'>
-							<option value='60'>60분</option>
-							<option value='90'>90분</option>
-						</Select>
-					</div>
-					<div className='md:col-span-2'>
-						<label className='text-sm font-medium text-slate-700'>
-							수업 소개
-						</label>
-						<textarea
-							name='description'
-							rows={3}
-							placeholder='수업 목표, 수업 방식 등 간단한 소개를 적어주세요.'
-							className='w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-[var(--primary)]'
-						/>
-						<p className='mt-1 text-xs text-slate-500'>
-							수업 목록과 학생 페이지에 표시됩니다.
-						</p>
-					</div>
+					<form
+						action={createCourse}
+						className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+						<div>
+							<label className='text-sm font-medium text-slate-700'>
+								수업명
+							</label>
+							<Input
+								name='title'
+								placeholder='예: 중등 수학 심화'
+								required
+							/>
+						</div>
+						<div>
+							<label className='text-sm font-medium text-slate-700'>
+								과목
+							</label>
+							<Input
+								name='subject'
+								placeholder='수학'
+								required
+							/>
+						</div>
+						<div>
+							<label className='text-sm font-medium text-slate-700'>
+								학년 범위
+							</label>
+							<Input
+								name='grade_range'
+								placeholder='중1-중3'
+								required
+							/>
+						</div>
+						<div>
+							<label className='text-sm font-medium text-slate-700'>
+								정원
+							</label>
+							<Input
+								name='capacity'
+								type='number'
+								min={1}
+								defaultValue={4}
+								required
+							/>
+						</div>
+						<div>
+							<label className='text-sm font-medium text-slate-700'>
+								수업 시간(분)
+							</label>
+							<Select
+								name='duration_minutes'
+								defaultValue='60'>
+								<option value='60'>60분</option>
+								<option value='90'>90분</option>
+							</Select>
+						</div>
+						<div className='md:col-span-2'>
+							<label className='text-sm font-medium text-slate-700'>
+								수업 소개
+							</label>
+							<textarea
+								name='description'
+								rows={3}
+								placeholder='수업 목표, 수업 방식 등 간단한 소개를 적어주세요.'
+								className='w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-[var(--primary)]'
+							/>
+							<p className='mt-1 text-xs text-slate-500'>
+								수업 목록과 학생 페이지에 표시됩니다.
+							</p>
+						</div>
 
-					<CourseScheduleFields />
+						<CourseScheduleFields />
 
-					<div className='md:col-span-2'>
-						<label className='text-sm font-medium text-slate-700'>
-							대표 이미지 (선택)
-						</label>
-						<Input
-							name='image'
-							type='file'
-							accept='image/*'
-						/>
-						<p className='mt-1 text-xs text-slate-500'>
-							수업 소개에 사용됩니다. (JPG, PNG 등 이미지
-							파일)
-						</p>
-					</div>
-					<div className='flex items-end'>
-						<Button type='submit'>등록</Button>
-					</div>
-				</form>
+						<div className='md:col-span-2'>
+							<label className='text-sm font-medium text-slate-700'>
+								대표 이미지 (선택)
+							</label>
+							<Input
+								name='image'
+								type='file'
+								accept='image/*'
+							/>
+							<p className='mt-1 text-xs text-slate-500'>
+								수업 소개에 사용됩니다. (JPG, PNG 등 이미지
+								파일)
+							</p>
+						</div>
+						<div className='flex items-end'>
+							<Button type='submit'>등록</Button>
+						</div>
+					</form>
 				</CardContent>
 			</Card>
 
@@ -164,33 +168,39 @@ export default async function AdminCoursesPage() {
 											</div>
 										)}
 									</div>
-							<div className='flex-1'>
-									<div className='flex items-start justify-between gap-2'>
-										<div>
-											<h3 className='text-base font-semibold text-slate-900'>
-												{course.title}
-											</h3>
-											<div className='mt-1 flex flex-wrap gap-2 text-xs'>
-												<span className='rounded-full bg-[var(--primary-soft)] px-2 py-1 font-semibold text-[var(--primary)]'>
-													{course.weeks}주 과정
-												</span>
-												<span className='rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700'>
-													{course.is_time_fixed ? '시간 확정' : '시간 협의'}
-												</span>
+									<div className='flex-1'>
+										<div className='flex items-start justify-between gap-2'>
+											<div>
+												<h3 className='text-base font-semibold text-slate-900'>
+													{course.title}
+												</h3>
+												<div className='mt-1 flex flex-wrap gap-2 text-xs'>
+													<span className='rounded-full bg-[var(--primary-soft)] px-2 py-1 font-semibold text-[var(--primary)]'>
+														{course.weeks}주 과정
+													</span>
+													<span className='rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700'>
+														{course.is_time_fixed
+															? '시간 확정'
+															: '시간 협의'}
+													</span>
+												</div>
+												<p className='text-sm text-slate-600'>
+													{course.subject} ·{' '}
+													{course.grade_range} ·{' '}
+													{course.duration_minutes}분
+													· 정원 {course.capacity}
+												</p>
+												{course.description && (
+													<p className='mt-1 max-h-12 overflow-hidden text-xs text-slate-700'>
+														{course.description}
+													</p>
+												)}
 											</div>
-											<p className='text-sm text-slate-600'>
-												{course.subject} ·{' '}
-												{course.grade_range} ·{' '}
-												{course.duration_minutes}분
-											· 정원 {course.capacity}
-										</p>
-										{course.description && (
-											<p className='mt-1 max-h-12 overflow-hidden text-xs text-slate-700'>
-												{course.description}
-											</p>
-										)}
-									</div>
-											<form action={deleteCourse.bind(null, course.id)}>
+											<form
+												action={deleteCourse.bind(
+													null,
+													course.id
+												)}>
 												<Button
 													variant='ghost'
 													className='text-red-600'
@@ -200,19 +210,6 @@ export default async function AdminCoursesPage() {
 											</form>
 										</div>
 									</div>
-								</div>
-								<div className='flex gap-2 text-sm'>
-									{course.is_time_fixed ? (
-										<Link
-											href={`/admin/courses/${course.id}/time-windows`}
-											className='rounded-md border border-[var(--primary-border)] px-3 py-2 text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
-												가능 시간 설정
-											</Link>
-									) : (
-										<span className='rounded-md border border-dashed border-slate-200 px-3 py-2 text-slate-500'>
-											시간 협의형 수업입니다
-										</span>
-									)}
 								</div>
 							</div>
 						))}
