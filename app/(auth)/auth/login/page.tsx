@@ -41,7 +41,7 @@ export default function LoginPage() {
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">비밀번호</label>
-              <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
+              <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required autoComplete='new-password'/>
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" className="w-full">
