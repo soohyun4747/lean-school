@@ -23,7 +23,7 @@ export async function uploadLandingImage(formData: FormData) {
   const fileName = `${crypto.randomUUID?.() ?? Date.now().toString()}.${extension}`;
   const filePath = `landing/${fileName}`;
 
-  const { error } = await supabase.storage.from("course-images").upload(filePath, image, {
+  const { error } = await supabase.storage.from("landing-images").upload(filePath, image, {
     cacheControl: "3600",
     upsert: false,
     contentType: image.type || undefined,
@@ -47,7 +47,7 @@ export async function deleteLandingImage(path: string) {
     throw new Error("잘못된 파일 경로입니다.");
   }
 
-  const { error } = await supabase.storage.from("course-images").remove([path]);
+  const { error } = await supabase.storage.from("landing-images").remove([path]);
 
   if (error) {
     console.error("랜딩 이미지 삭제 실패:", error);
