@@ -69,7 +69,10 @@ function validateTimeWindows(windows: TimeWindowInput[]) {
 
 export type CourseCreationResult = { success: boolean; error?: string };
 
-export async function createCourse(_prevState: CourseCreationResult, formData: FormData): Promise<CourseCreationResult> {
+export async function createCourse(
+	_prevState: CourseCreationResult,
+	formData: FormData
+): Promise<CourseCreationResult> {
 	const { session, profile } = await requireSession();
 	requireRole(profile.role, ['admin']);
 	const supabase = await getSupabaseServerClient();
@@ -104,16 +107,24 @@ export async function createCourse(_prevState: CourseCreationResult, formData: F
 	}
 	validateTimeWindows(parsedWindows);
 
-	let slotWindows: (TimeWindowInput & { start_time: string; end_time: string })[] = [];
+	let slotWindows: (TimeWindowInput & {
+		start_time: string;
+		end_time: string;
+	})[] = [];
 	try {
-		slotWindows = parsedWindows.flatMap((window) => splitWindowByDuration(window, duration));
+		slotWindows = parsedWindows.flatMap((window) =>
+			splitWindowByDuration(window, duration)
+		);
 	} catch (error) {
 		return { success: false, error: (error as Error).message };
 	}
 
 	if (imageFile instanceof File && imageFile.size > 0) {
 		if (imageFile.type && !imageFile.type.startsWith('image/')) {
-			return { success: false, error: '이미지 파일만 업로드할 수 있습니다.' };
+			return {
+				success: false,
+				error: '이미지 파일만 업로드할 수 있습니다.',
+			};
 		}
 
 		const extension = imageFile.name.split('.').pop() || 'png';
@@ -183,7 +194,10 @@ export async function createCourse(_prevState: CourseCreationResult, formData: F
 		if (windowError) {
 			console.error('course time window insert error:', windowError);
 			await supabase.from('courses').delete().eq('id', newCourse.id);
-			return { success: false, error: '수업 생성 중 시간이 저장되지 않았습니다. 다시 시도해주세요.' };
+			return {
+				success: false,
+				error: '수업 생성 중 시간이 저장되지 않았습니다. 다시 시도해주세요.',
+			};
 		}
 	}
 
@@ -234,10 +248,18 @@ export async function createTimeWindow(courseId: string, formData: FormData) {
 		throw new Error('요일과 시간을 올바르게 입력해주세요.');
 	}
 
-	let slotWindows: { start_time: string; end_time: string; day_of_week: number }[];
+	let slotWindows: {
+		start_time: string;
+		end_time: string;
+		day_of_week: number;
+	}[];
 	try {
 		slotWindows = splitWindowByDuration(
-			{ day_of_week: dayOfWeek, start_time: startTime, end_time: endTime },
+			{
+				day_of_week: dayOfWeek,
+				start_time: startTime,
+				end_time: endTime,
+			},
 			course.duration_minutes
 		);
 	} catch (error) {
@@ -345,16 +367,15 @@ export async function generateScheduleProposals(courseId: string) {
 		.eq('course_id', courseId)
 		.eq('status', 'proposed');
 
-	const pendingApplications =
-		(applications ?? []).filter((app) => app.status === 'pending');
+	const pendingApplications = (applications ?? []).filter(
+		(app) => app.status === 'pending'
+	);
 	const sortedWindows =
-		windows
-			?.slice()
-			.sort((a, b) => {
-				if (a.day_of_week !== b.day_of_week)
-					return a.day_of_week - b.day_of_week;
-				return a.start_time.localeCompare(b.start_time);
-			}) ?? [];
+		windows?.slice().sort((a, b) => {
+			if (a.day_of_week !== b.day_of_week)
+				return a.day_of_week - b.day_of_week;
+			return a.start_time.localeCompare(b.start_time);
+		}) ?? [];
 
 	const assignedStudents = new Set<string>();
 	const reference = new Date();
@@ -393,26 +414,35 @@ export async function generateScheduleProposals(courseId: string) {
 			.select('id')
 			.single();
 
-		if (error || !match?.id) continue;
+		if (error || !match?.id) {
+			console.error(error);
+			continue;
+		}
 
 		const capacity = window.capacity ?? course.capacity;
 		const selected = candidates.slice(0, capacity);
 		selected.forEach((app) => assignedStudents.add(app.student_id));
 
 		if (selected.length > 0) {
-			await supabase.from('match_students').insert(
+			const { error } = await supabase.from('match_students').insert(
 				selected.map((app) => ({
 					match_id: match.id,
 					student_id: app.student_id,
 				}))
 			);
+			if (error) {
+				console.error(error);
+			}
 		}
 	}
 
 	revalidatePath(`/admin/courses/${courseId}`);
 }
 
-export async function updateProposedMatch(courseId: string, formData: FormData) {
+export async function updateProposedMatch(
+	courseId: string,
+	formData: FormData
+) {
 	const { profile } = await requireSession();
 	requireRole(profile.role, ['admin']);
 	const supabase = await getSupabaseServerClient();
