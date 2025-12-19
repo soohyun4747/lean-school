@@ -19,7 +19,7 @@ export async function getSessionAndProfile() {
 
 	const { data: profile } = await supabase
 		.from('profiles')
-		.select('id, role, name, phone')
+		.select('id, role, name, phone, email, birthdate, kakao_id, country')
 		.eq('id', user.id)
 		.single();
 

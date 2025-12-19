@@ -2,6 +2,7 @@ import { addInstructorSubject, deleteInstructorSubject } from "@/app/actions/ins
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { requireSession, requireRole } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -52,9 +53,9 @@ export default async function InstructorSubjectsPage() {
                 <p className="text-xs text-slate-600">{item.grade_range}</p>
               </div>
               <form action={deleteInstructorSubject.bind(null, item.id)}>
-                <Button variant="ghost" className="text-red-600" type="submit">
+                <ConfirmSubmitButton variant="ghost" className="text-red-600">
                   삭제
-                </Button>
+                </ConfirmSubmitButton>
               </form>
             </div>
           ))}

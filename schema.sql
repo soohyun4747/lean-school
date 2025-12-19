@@ -5,7 +5,11 @@ create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   role text not null default 'student' check (role in ('admin','student','instructor')),
   name text not null default '',
+  email text not null default '',
   phone text,
+  birthdate date,
+  kakao_id text,
+  country text,
   created_at timestamptz not null default now()
 );
 
@@ -15,7 +19,6 @@ create table if not exists courses (
   subject text not null,
   grade_range text not null,
   description text,
-  is_time_fixed boolean not null default false,
   weeks int not null default 1,
   duration_minutes int not null default 60,
   capacity int not null default 4,
@@ -30,7 +33,18 @@ create table if not exists course_time_windows (
   day_of_week int not null check (day_of_week between 0 and 6),
   start_time time not null,
   end_time time not null,
+  instructor_id uuid references profiles(id) on delete set null,
+  instructor_name text,
+  capacity int not null default 1,
   constraint time_window_valid check (start_time < end_time)
+);
+
+create table if not exists application_time_choices (
+  id uuid primary key default uuid_generate_v4(),
+  application_id uuid not null references applications(id) on delete cascade,
+  window_id uuid not null references course_time_windows(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint application_window_unique unique (application_id, window_id)
 );
 
 create table if not exists instructor_subjects (
@@ -65,7 +79,8 @@ create table if not exists matches (
   course_id uuid not null references courses(id) on delete cascade,
   slot_start_at timestamptz not null,
   slot_end_at timestamptz not null,
-  instructor_id uuid not null references profiles(id) on delete cascade,
+  instructor_id uuid references profiles(id) on delete set null,
+  instructor_name text,
   status text not null default 'proposed' check (status in ('proposed','confirmed','rescheduled','cancelled')),
   updated_by uuid references profiles(id),
   note text,
@@ -113,12 +128,16 @@ create index if not exists idx_matching_runs_course on matching_runs(course_id);
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles(id, role, name, phone)
+  insert into public.profiles(id, role, name, phone, email, birthdate, kakao_id, country)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'role', 'student'),
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    new.raw_user_meta_data->>'phone'
+    new.raw_user_meta_data->>'phone',
+    coalesce(new.email, ''),
+    to_date(new.raw_user_meta_data->>'birthdate', 'YYYY-MM-DD'),
+    new.raw_user_meta_data->>'kakao_id',
+    new.raw_user_meta_data->>'country'
   );
   return new;
 end;

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { deleteCourse } from '@/app/actions/admin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { ConfirmSubmitButton } from '@/components/ui/confirm-submit-button';
 import { requireSession, requireRole } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { CourseCreateModal } from '@/components/features/course-create-modal';
@@ -14,7 +14,6 @@ export interface ICourse {
 	description: string | null;
 	capacity: number;
 	duration_minutes: number;
-	is_time_fixed: boolean;
 	weeks: number;
 	created_at: number;
 	image_url: string;
@@ -24,12 +23,19 @@ export default async function AdminCoursesPage() {
 	const { profile } = await requireSession();
 	requireRole(profile.role, ['admin']);
 	const supabase = await getSupabaseServerClient();
-	const { data: courses, error } = await supabase
-		.from('courses')
-		.select(
-			'id, title, subject, grade_range, description, capacity, duration_minutes, created_at, image_url, is_time_fixed, weeks'
-		)
-		.order('created_at', { ascending: false });
+	const [{ data: courses, error }, { data: instructors }] = await Promise.all([
+		supabase
+			.from('courses')
+			.select(
+				'id, title, subject, grade_range, description, capacity, duration_minutes, created_at, image_url, weeks'
+			)
+			.order('created_at', { ascending: false }),
+		supabase
+			.from('profiles')
+			.select('id, name, email')
+			.eq('role', 'instructor')
+			.order('name', { ascending: true }),
+	]);
 
 	if (error) {
 		console.error(error);
@@ -42,7 +48,7 @@ export default async function AdminCoursesPage() {
 					<h1 className='text-2xl font-bold text-slate-900'>수업 관리</h1>
 					<p className='text-sm text-slate-600'>수업을 등록하고, 등록된 수업을 눌러 상세 관리 페이지로 이동하세요.</p>
 				</div>
-				<CourseCreateModal />
+				<CourseCreateModal instructors={instructors ?? []} />
 			</div>
 
 			<Card>
@@ -87,9 +93,6 @@ export default async function AdminCoursesPage() {
 													<span className='rounded-full bg-[var(--primary-soft)] px-2 py-1 font-semibold text-[var(--primary)]'>
 														{course.weeks}주 과정
 													</span>
-													<span className='rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700'>
-														{course.is_time_fixed ? '시간 확정' : '시간 협의'}
-													</span>
 												</div>
 												<p className='text-sm text-slate-600'>
 													{course.subject} ·{' '}
@@ -112,24 +115,17 @@ export default async function AdminCoursesPage() {
 										className='rounded-md border border-[var(--primary-border)] px-3 py-2 font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
 											상세 보기
 										</Link>
-									{course.is_time_fixed ? (
-										<Link
-											href={`/admin/courses/${course.id}/time-windows`}
-											className='rounded-md border border-[var(--primary-border)] px-3 py-2 text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
-												가능 시간 설정
-											</Link>
-									) : (
-										<span className='rounded-md border border-dashed border-slate-200 px-3 py-2 text-slate-500'>
-											시간 협의형 수업입니다
-										</span>
-									)}
+									<Link
+										href={`/admin/courses/${course.id}/time-windows`}
+										className='rounded-md border border-[var(--primary-border)] px-3 py-2 text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
+											시간 관리
+										</Link>
 									<form action={deleteCourse.bind(null, course.id)} className='ml-auto'>
-										<Button
+										<ConfirmSubmitButton
 											variant='ghost'
-											className='text-red-600'
-											type='submit'>
+											className='text-red-600'>
 											삭제
-										</Button>
+										</ConfirmSubmitButton>
 									</form>
 								</div>
 							</div>

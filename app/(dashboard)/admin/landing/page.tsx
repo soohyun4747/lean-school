@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { deleteLandingImage, uploadLandingImage } from "@/app/actions/landing";
 import { fetchLandingImages } from "@/lib/landing";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 
 export default async function LandingAdminPage() {
   const images = await fetchLandingImages();
@@ -94,12 +95,12 @@ export default async function LandingAdminPage() {
                   )}
                   <form action={deleteLandingImage}>
                     <input type="hidden" name="path" value={image.path} />
-                    <button
-                      type="submit"
-                      className="w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                    <ConfirmSubmitButton
+                      className="w-full border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                      variant="ghost"
                     >
                       삭제
-                    </button>
+                    </ConfirmSubmitButton>
                   </form>
                 </div>
               </article>

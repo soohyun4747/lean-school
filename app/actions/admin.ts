@@ -10,6 +10,9 @@ type TimeWindowInput = {
 	day_of_week: number;
 	start_time: string;
 	end_time: string;
+	instructor_id?: string | null;
+	instructor_name?: string | null;
+	capacity?: number | null;
 };
 
 const ALLOWED_WEEKS = [1, 2, 3, 4, 6, 8, 12];
@@ -19,7 +22,13 @@ function parseTimeWindows(raw: string): TimeWindowInput[] {
 
 	try {
 		const parsed = JSON.parse(raw) as TimeWindowInput[];
-		return Array.isArray(parsed) ? parsed : [];
+		if (!Array.isArray(parsed)) return [];
+		return parsed.map((w) => ({
+			...w,
+			capacity: Number.isNaN(Number(w.capacity)) ? 1 : Number(w.capacity),
+			instructor_id: w.instructor_id || null,
+			instructor_name: w.instructor_name || null,
+		}));
 	} catch (error) {
 		console.error('time window parse error', error);
 		return [];
@@ -56,6 +65,12 @@ function validateTimeWindows(windows: TimeWindowInput[]) {
 		if (startMinutes >= endMinutes) {
 			throw new Error('시작 시간은 종료 시간보다 이전이어야 합니다.');
 		}
+
+		if (w.capacity !== undefined && w.capacity !== null) {
+			if (Number.isNaN(w.capacity) || w.capacity < 1) {
+				throw new Error('정원은 1명 이상이어야 합니다.');
+			}
+		}
 	});
 }
 
@@ -70,7 +85,6 @@ export async function createCourse(formData: FormData) {
 	const description = String(formData.get('description') ?? '').trim();
 	const capacity = Number(formData.get('capacity') ?? 4);
 	const duration = Number(formData.get('duration_minutes') ?? 60);
-	const isTimeFixed = String(formData.get('is_time_fixed') ?? 'false') === 'true';
 	const weeks = Number(formData.get('weeks') ?? 1);
 	const parsedWindows = parseTimeWindows(
 		String(formData.get('time_windows') ?? '')
@@ -90,12 +104,10 @@ export async function createCourse(formData: FormData) {
 		throw new Error('설명은 800자 이내로 작성해주세요.');
 	}
 
-	if (isTimeFixed) {
-		if (parsedWindows.length === 0) {
-			throw new Error('고정 시간을 1개 이상 추가해주세요.');
-		}
-		validateTimeWindows(parsedWindows);
+	if (parsedWindows.length === 0) {
+		throw new Error('시간 범위를 1개 이상 추가해주세요.');
 	}
+	validateTimeWindows(parsedWindows);
 
 	if (imageFile instanceof File && imageFile.size > 0) {
 		if (imageFile.type && !imageFile.type.startsWith('image/')) {
@@ -136,7 +148,6 @@ export async function createCourse(formData: FormData) {
 			subject,
 			grade_range: gradeRange,
 			description: description || null,
-			is_time_fixed: isTimeFixed,
 			weeks,
 			capacity,
 			duration_minutes: duration,
@@ -152,12 +163,15 @@ export async function createCourse(formData: FormData) {
 		throw new Error(`Insert failed: ${error.message}`);
 	}
 
-	if (isTimeFixed && newCourse?.id) {
+	if (newCourse?.id) {
 		const timeWindows = parsedWindows.map((w) => ({
 			course_id: newCourse.id,
 			day_of_week: w.day_of_week,
 			start_time: w.start_time,
 			end_time: w.end_time,
+			instructor_id: w.instructor_id || null,
+			instructor_name: w.instructor_name || null,
+			capacity: w.capacity ?? 1,
 		}));
 
 		const { error: windowError } = await supabase
@@ -172,6 +186,7 @@ export async function createCourse(formData: FormData) {
 	}
 
 	revalidatePath('/admin/courses');
+	revalidatePath('/classes');
 }
 
 export async function deleteCourse(courseId: string) {
@@ -188,6 +203,7 @@ export async function deleteCourse(courseId: string) {
 		console.error(error);
 	}
 	revalidatePath('/admin/courses');
+	revalidatePath('/classes');
 }
 
 export async function createTimeWindow(courseId: string, formData: FormData) {
@@ -198,19 +214,16 @@ export async function createTimeWindow(courseId: string, formData: FormData) {
 	const dayOfWeek = Number(formData.get('day_of_week'));
 	const startTime = String(formData.get('start_time') ?? '');
 	const endTime = String(formData.get('end_time') ?? '');
-
-	const { data: course } = await supabase
-		.from('courses')
-		.select('is_time_fixed')
-		.eq('id', courseId)
-		.single();
-
-	if (!course?.is_time_fixed) {
-		throw new Error('시간 협의형 수업에는 고정 시간을 추가할 수 없습니다.');
-	}
+	const instructorId = String(formData.get('instructor_id') ?? '').trim();
+	const instructorName = String(formData.get('instructor_name') ?? '').trim();
+	const capacityRaw = Number(formData.get('capacity') ?? 1);
 
 	if (Number.isNaN(dayOfWeek) || !startTime || !endTime) {
 		throw new Error('요일과 시간을 올바르게 입력해주세요.');
+	}
+
+	if (Number.isNaN(capacityRaw) || capacityRaw < 1) {
+		throw new Error('정원은 1명 이상이어야 합니다.');
 	}
 
 	const { error } = await supabase.from('course_time_windows').insert({
@@ -218,6 +231,9 @@ export async function createTimeWindow(courseId: string, formData: FormData) {
 		day_of_week: dayOfWeek,
 		start_time: startTime,
 		end_time: endTime,
+		instructor_id: instructorId || null,
+		instructor_name: instructorName || null,
+		capacity: capacityRaw,
 	});
 
 	if (error) {
@@ -225,6 +241,7 @@ export async function createTimeWindow(courseId: string, formData: FormData) {
 	}
 
 	revalidatePath(`/admin/courses/${courseId}/time-windows`);
+	revalidatePath(`/admin/courses/${courseId}`);
 }
 
 export async function deleteTimeWindow(id: string, courseId: string) {
@@ -233,6 +250,7 @@ export async function deleteTimeWindow(id: string, courseId: string) {
 	const supabase = await getSupabaseServerClient();
 	await supabase.from('course_time_windows').delete().eq('id', id);
 	revalidatePath(`/admin/courses/${courseId}/time-windows`);
+	revalidatePath(`/admin/courses/${courseId}`);
 }
 
 export type MatchingFormState = { error?: string; success?: string };

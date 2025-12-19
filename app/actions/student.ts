@@ -5,22 +5,26 @@ import { requireSession, requireRole } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { runMatching } from "@/lib/matching";
 
-export async function applyToCourse(courseId: string, slotsString: string) {
+export async function applyToCourse(courseId: string, windowIds: string[]) {
 	const { session, profile } = await requireSession();
 	requireRole(profile.role, ['student']);
 	const supabase = await getSupabaseServerClient();
-
-	const slots = slotsString
-		.split(',')
-		.map((s) => s.trim())
-		.filter(Boolean)
-		.map((s) => {
-			const [start, end] = s.split('|');
-			return { start, end };
-		});
-
-	if (slots.length === 0) {
+	const windowSet = Array.from(new Set(windowIds)).filter(Boolean);
+	if (windowSet.length === 0) {
 		throw new Error('최소 1개 이상의 시간을 선택해주세요.');
+	}
+
+	const { data: windows } = await supabase
+		.from('course_time_windows')
+		.select('id')
+		.eq('course_id', courseId)
+		.in('id', windowSet);
+
+	if (!windows || windows.length === 0) {
+		throw new Error('선택한 시간이 유효하지 않습니다.');
+	}
+	if (windows.length !== windowSet.length) {
+		throw new Error('존재하지 않는 시간이 포함되어 있습니다.');
 	}
 
 	const { data: application, error } = await supabase
@@ -33,22 +37,26 @@ export async function applyToCourse(courseId: string, slotsString: string) {
 		console.error(error);
 	}
 
-	const slotRows = slots.map((slot) => ({
-		course_id: courseId,
-		user_id: session!.user.id,
-		role: 'student' as const,
-		start_at: slot.start,
-		end_at: slot.end,
-		capacity: 1,
-	}));
+	if (application?.id) {
+		const choiceRows = windowSet.map((wid) => ({
+			application_id: application.id,
+			window_id: wid,
+		}));
+		const { error: choiceError } = await supabase
+			.from('application_time_choices')
+			.insert(choiceRows);
+		if (choiceError) {
+			console.error('신청 시간 저장 실패', choiceError);
+			throw new Error('선택한 시간 저장에 실패했습니다. 다시 시도해주세요.');
+		}
+	}
 
   try {
-    const starts = slotRows.map((s) => new Date(s.start_at).getTime());
-    const ends = slotRows.map((s) => new Date(s.end_at).getTime());
-    const from = new Date(Math.min(...starts)).toISOString();
-    const to = new Date(Math.max(...ends)).toISOString();
+    const from = new Date();
+    const to = new Date();
+    to.setDate(from.getDate() + 14);
 
-    await runMatching({ courseId, from, to, requestedBy: session!.user.id });
+    await runMatching({ courseId, from: from.toISOString(), to: to.toISOString(), requestedBy: session!.user.id });
   } catch (error) {
     console.error("자동 매칭 실행 실패", error);
   }

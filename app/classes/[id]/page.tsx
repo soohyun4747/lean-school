@@ -3,13 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireSession, requireRole } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { ICourse } from '@/app/(dashboard)/admin/courses/page';
-import {
-	buildSlotsFromDayTimeRanges,
-	generateSlotsFromWindows,
-} from '@/lib/time';
 import { applyToCourse } from '@/app/actions/student';
 import { Button } from '@/components/ui/button';
-import { AvailabilityRequestFields } from '@/components/features/availability-request-fields';
 
 const days = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -28,7 +23,7 @@ export default async function StudentCourseDetail({
 	const { data } = await supabase
 		.from('courses')
 		.select(
-			'id, title, subject, grade_range, description, duration_minutes, capacity, image_url, is_time_fixed, weeks'
+			'id, title, subject, grade_range, description, duration_minutes, capacity, image_url, weeks'
 		)
 		.eq('id', id)
 		.single();
@@ -39,7 +34,7 @@ export default async function StudentCourseDetail({
 
 	const { data: windows, error } = await supabase
 		.from('course_time_windows')
-		.select('id, day_of_week, start_time, end_time')
+		.select('id, day_of_week, start_time, end_time, instructor_id, instructor_name, capacity')
 		.eq('course_id', course.id)
 		.order('day_of_week', { ascending: true });
 
@@ -47,54 +42,13 @@ export default async function StudentCourseDetail({
 		console.error({ error });
 	}
 
-	const slots = generateSlotsFromWindows(windows ?? [], {
-		durationMinutes: course.duration_minutes,
-	});
-	const availableSlots = slots.map((slot) => ({
-		start: slot.start.toISOString(),
-		end: slot.end.toISOString(),
-	}));
-
 	async function action(formData: FormData) {
 		'use server';
-
-		if (course.is_time_fixed) {
-			const slotsString = availableSlots
-				.map((slot) => `${slot.start}|${slot.end}`)
-				.join(',');
-
-			if (!slotsString) {
-				throw new Error('등록된 고정 시간이 없습니다.');
-			}
-
-			await applyToCourse(course.id, slotsString);
-			redirect('/student/applications');
-		}
-
-		const availabilityRaw = String(
-			formData.get('availability_json') ?? '[]'
-		);
-
-		let availability: {
-			day_of_week: number;
-			start_time: string;
-			end_time: string;
-		}[] = [];
-		try {
-			availability = JSON.parse(availabilityRaw);
-		} catch (error) {
-			console.error('availability parse error', error);
-		}
-
-		const slotsFromAvailability = buildSlotsFromDayTimeRanges(availability);
-		if (slotsFromAvailability.length === 0) {
-			throw new Error('가능 시간을 1개 이상 추가해주세요.');
-		}
-
-		const slotsString = slotsFromAvailability
-			.map((slot) => `${slot.start}|${slot.end}`)
-			.join(',');
-		await applyToCourse(course.id, slotsString);
+		const selected = formData
+			.getAll('window_ids')
+			.map((w) => String(w))
+			.filter(Boolean);
+		await applyToCourse(course.id, selected);
 		redirect('/student/applications');
 	}
 
@@ -134,11 +88,6 @@ export default async function StudentCourseDetail({
 								<span className='rounded-full bg-[var(--primary-soft)] px-3 py-1 text-[var(--primary)]'>
 									{course.weeks}주 과정
 								</span>
-								<span className='rounded-full bg-slate-100 px-3 py-1 text-slate-700'>
-									{course.is_time_fixed
-										? '시간 확정형'
-										: '시간 협의형'}
-								</span>
 							</div>
 						</div>
 					</div>
@@ -174,57 +123,53 @@ export default async function StudentCourseDetail({
 				</Card> */}
 				<Card>
 					<CardHeader>
-						<CardTitle>
-							{course.is_time_fixed
-								? '수업 시간'
-								: '가능한 시간 선택'}
-						</CardTitle>
+						<CardTitle>신청 시간 선택</CardTitle>
 					</CardHeader>
 					<CardContent className='space-y-4'>
 						<form
 							action={action}
 							className='space-y-4'>
-							{course.is_time_fixed ? (
-								<div className='space-y-2 text-sm'>
-									{(windows ?? []).length === 0 && (
-										<p className='text-slate-600'>
-											관리자가 아직 시간을 등록하지
-											않았습니다.
-										</p>
-									)}
+							<div className='space-y-3'>
+								<p className='text-sm text-slate-700'>
+									가능한 시간대를 선택해주세요. 여러 개를 선택할 수 있습니다.
+								</p>
+								{(windows ?? []).length === 0 && (
+									<p className='text-slate-600'>
+										관리자가 아직 시간을 등록하지 않았습니다.
+									</p>
+								)}
+								<div className='space-y-2'>
 									{windows?.map((w) => (
-										<div
+										<label
 											key={w.id}
-											className='flex items-center justify-between rounded-md border border-slate-200 px-3 py-2'>
-											<span className='font-semibold text-slate-800'>
-												{days[w.day_of_week]}
-											</span>
-											<span className='text-slate-700'>
-												{w.start_time} - {w.end_time}
-											</span>
-										</div>
+											className='flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm'>
+											<div className='flex items-center gap-3'>
+												<input
+													type='checkbox'
+													name='window_ids'
+													value={w.id}
+													className='h-4 w-4 accent-[var(--primary)]'
+												/>
+												<div>
+													<p className='font-semibold text-slate-900'>
+														{days[w.day_of_week]} {w.start_time} - {w.end_time}
+													</p>
+													<p className='text-xs text-slate-600'>
+														강사: {w.instructor_name || w.instructor_id || '미지정'} · 정원 {w.capacity ?? 1}명
+													</p>
+												</div>
+											</div>
+										</label>
 									))}
-									<p className='text-xs text-slate-600'>
-										위 일정으로 바로 신청합니다. 선택 항목은
-										없습니다.
-									</p>
 								</div>
-							) : (
-								<div className='space-y-3'>
-									<p className='text-sm text-slate-700'>
-										가능한 요일과 시간대를 1개 이상
-										추가해주세요.
-									</p>
-									<AvailabilityRequestFields />
-									<p className='text-xs text-slate-600'>
-										요일과 시간은 가장 가까운 날짜 기준으로
-										저장됩니다.
-									</p>
-								</div>
-							)}
+								<p className='text-xs text-slate-600'>
+									선택한 시간 기준으로 신청이 접수됩니다.
+								</p>
+							</div>
 							<Button
 								type='submit'
-								className='w-full'>
+								className='w-full'
+								disabled={(windows ?? []).length === 0}>
 								신청하기
 							</Button>
 						</form>

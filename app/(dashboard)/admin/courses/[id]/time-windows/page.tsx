@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { ConfirmSubmitButton } from '@/components/ui/confirm-submit-button';
 import { createTimeWindow, deleteTimeWindow } from '@/app/actions/admin';
 import { requireSession, requireRole } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
@@ -33,7 +34,7 @@ export default async function CourseTimeWindowsPage({
 	const { data } = await supabase
 		.from('courses')
 		.select(
-			'id, title, subject, grade_range, description, duration_minutes, capacity, image_url, is_time_fixed, weeks'
+			'id, title, subject, grade_range, description, duration_minutes, capacity, image_url, weeks'
 		)
 		.eq('id', id) // ✅ params.id 대신 id
 		.single();
@@ -42,12 +43,20 @@ export default async function CourseTimeWindowsPage({
 
   const course: ICourse = data;
 
-	const { data: windows } = await supabase
+	const [{ data: windows }, { data: instructors }] = await Promise.all([
+		supabase
 		.from('course_time_windows')
-		.select('id, day_of_week, start_time, end_time')
+		.select('id, day_of_week, start_time, end_time, instructor_id, instructor_name, capacity')
 		.eq('course_id', course.id)
 		.order('day_of_week', { ascending: true })
-		.order('start_time', { ascending: true });
+		.order('start_time', { ascending: true }),
+		supabase
+			.from('profiles')
+			.select('id, name, email')
+			.eq('role', 'instructor')
+			.order('name', { ascending: true }),
+	]);
+	const instructorMap = new Map((instructors ?? []).map((i) => [i.id, i]));
 
 	return (
 		<div className='space-y-6'>
@@ -72,14 +81,9 @@ export default async function CourseTimeWindowsPage({
 					<CardTitle>시간 추가</CardTitle>
 				</CardHeader>
 				<CardContent className='space-y-3'>
-					{!course.is_time_fixed && (
-						<p className='rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800'>
-							이 수업은 시간 협의형으로 등록되어 있습니다. 시간을 추가하려면 먼저 수업을 시간 확정으로 설정해주세요.
-						</p>
-					)}
 					<form
 						action={createTimeWindow.bind(null, course.id)}
-						className='grid grid-cols-1 gap-3 md:grid-cols-4'>
+						className='grid grid-cols-1 gap-3 md:grid-cols-6'>
 						<div>
 							<label className='text-sm font-medium text-slate-700'>
 								요일
@@ -87,8 +91,7 @@ export default async function CourseTimeWindowsPage({
 							<Select
 								name='day_of_week'
 								required
-								defaultValue='1'
-								disabled={!course.is_time_fixed}>
+								defaultValue='1'>
 								{days.map((label, idx) => (
 									<option
 										key={label}
@@ -106,7 +109,6 @@ export default async function CourseTimeWindowsPage({
 								name='start_time'
 								type='time'
 								required
-								disabled={!course.is_time_fixed}
 							/>
 						</div>
 						<div>
@@ -117,11 +119,44 @@ export default async function CourseTimeWindowsPage({
 								name='end_time'
 								type='time'
 								required
-								disabled={!course.is_time_fixed}
+							/>
+						</div>
+						<div>
+							<label className='text-sm font-medium text-slate-700'>
+								정원
+							</label>
+							<Input
+								name='capacity'
+								type='number'
+								min={1}
+								defaultValue={1}
+								required
+							/>
+						</div>
+						<div>
+							<label className='text-sm font-medium text-slate-700'>
+								강사 선택
+							</label>
+							<Select name='instructor_id' defaultValue=''>
+								<option value=''>직접 입력 또는 미지정</option>
+								{instructors?.map((inst) => (
+									<option key={inst.id} value={inst.id}>
+										{inst.name || '이름 미입력'} ({inst.email || '이메일 없음'})
+									</option>
+								))}
+							</Select>
+						</div>
+						<div>
+							<label className='text-sm font-medium text-slate-700'>
+								강사 이름(직접 입력)
+							</label>
+							<Input
+								name='instructor_name'
+								placeholder='예: 외부 강사'
 							/>
 						</div>
 						<div className='flex items-end'>
-							<Button type='submit' disabled={!course.is_time_fixed}>
+							<Button type='submit'>
 								추가
 							</Button>
 						</div>
@@ -151,6 +186,14 @@ export default async function CourseTimeWindowsPage({
 									<p className='text-slate-600'>
 										{w.start_time} - {w.end_time}
 									</p>
+									<p className='text-xs text-slate-600'>
+										강사:{' '}
+										{instructorMap.get(w.instructor_id ?? '')?.name ||
+											w.instructor_name ||
+											w.instructor_id ||
+											'미지정'}{' '}
+										· 정원 {w.capacity ?? 1}명
+									</p>
 								</div>
 								<form
 									action={deleteTimeWindow.bind(
@@ -158,12 +201,11 @@ export default async function CourseTimeWindowsPage({
 										w.id,
 										course.id
 									)}>
-									<Button
-										type='submit'
+									<ConfirmSubmitButton
 										variant='ghost'
 										className='text-red-600'>
 										삭제
-									</Button>
+									</ConfirmSubmitButton>
 								</form>
 							</div>
 						))}

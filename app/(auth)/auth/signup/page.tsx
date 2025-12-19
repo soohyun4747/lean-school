@@ -20,6 +20,9 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [birthdate, setBirthdate] = useState("");
+  const [kakaoId, setKakaoId] = useState("");
+  const [country, setCountry] = useState("");
   const [role, setRole] = useState("student");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +44,14 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        data: { role, name, phone: trimmedPhone },
+        data: {
+          role,
+          name,
+          phone: trimmedPhone,
+          birthdate: birthdate || null,
+          kakao_id: kakaoId || null,
+          country: country || null,
+        },
       },
     });
 
@@ -51,10 +61,18 @@ export default function SignupPage() {
     }
 
     const userId = signUpData.user?.id;
-    if (userId && trimmedPhone && signUpData.session) {
+    if (userId && signUpData.session) {
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ phone: trimmedPhone, name, role })
+        .update({
+          phone: trimmedPhone || null,
+          name,
+          role,
+          birthdate: birthdate || null,
+          kakao_id: kakaoId || null,
+          country: country || null,
+          email,
+        })
         .eq("id", userId);
 
       if (profileError) {
@@ -105,6 +123,18 @@ export default function SignupPage() {
                 type="tel"
                 required
               />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">생년월일</label>
+              <Input value={birthdate} onChange={(e) => setBirthdate(e.target.value)} type="date" required />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">카카오톡 ID (선택)</label>
+              <Input value={kakaoId} onChange={(e) => setKakaoId(e.target.value)} placeholder="kakao_example" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">거주 국가</label>
+              <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="대한민국" required />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">역할</label>

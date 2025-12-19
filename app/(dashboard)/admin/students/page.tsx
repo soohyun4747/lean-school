@@ -6,57 +6,62 @@ import { formatDateTime } from '@/lib/time';
 type StudentProfile = {
 	id: string;
 	name: string;
+	email: string;
 	phone: string | null;
+	birthdate: string | null;
+	kakao_id: string | null;
+	country: string | null;
 	created_at: string;
 };
 
-export default async function AdminStudentsPage() {
+export default async function AdminStudentsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
 	const { profile } = await requireSession();
 	requireRole(profile.role, ['admin']);
 	const supabase = await getSupabaseServerClient();
 
-	const { data: students, error } = await supabase
+	const { q = '' } = await searchParams;
+	const searchKeyword = Array.isArray(q) ? q[0] : q;
+
+	let query = supabase
 		.from('profiles')
-		.select('id, name, phone, created_at')
+		.select('id, name, email, phone, birthdate, kakao_id, country, created_at')
 		.eq('role', 'student')
 		.order('created_at', { ascending: false });
+
+	if (searchKeyword) {
+		const keyword = `%${searchKeyword}%`;
+		query = query.or(
+			`name.ilike.${keyword},email.ilike.${keyword},phone.ilike.${keyword},kakao_id.ilike.${keyword},country.ilike.${keyword}`
+		);
+	}
+
+	const { data: students, error } = await query;
 
 	if (error) {
 		console.error(error);
 	}
 
-	const { data: applications } = await supabase
-		.from('applications')
-		.select('id, student_id, status');
-
-	const { data: availability } = await supabase
-		.from('availability_slots')
-		.select('user_id')
-		.eq('role', 'student');
-
-	const appMap = new Map<string, { total: number; pending: number }>();
-	(applications ?? []).forEach((app) => {
-		const entry = appMap.get(app.student_id) ?? { total: 0, pending: 0 };
-		entry.total += 1;
-		if (app.status === 'pending') entry.pending += 1;
-		appMap.set(app.student_id, entry);
-	});
-
-	const availabilityCount = new Map<string, number>();
-	(availability ?? []).forEach((slot) => {
-		availabilityCount.set(
-			slot.user_id,
-			(availabilityCount.get(slot.user_id) ?? 0) + 1
-		);
-	});
-
 	const studentRows: StudentProfile[] = students ?? [];
 
 	return (
 		<div className='space-y-6'>
-			<div className='space-y-1'>
+			<div className='space-y-2'>
 				<h1 className='text-2xl font-bold text-slate-900'>학생 관리</h1>
-				<p className='text-sm text-slate-600'>학생 연락처, 신청 현황, 가능한 시간 슬롯을 표로 확인하세요.</p>
+				<p className='text-sm text-slate-600'>학생 기본 정보와 연락처를 확인하고 검색할 수 있습니다.</p>
+				<form className='flex max-w-md items-center gap-2'>
+					<input
+						type='text'
+						name='q'
+						defaultValue={searchKeyword ?? ''}
+						placeholder='이름, 이메일, 연락처, 카카오톡 ID 검색'
+						className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm'
+					/>
+					<button
+						type='submit'
+						className='rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white'>
+						검색
+					</button>
+				</form>
 			</div>
 
 			<Card>
@@ -71,24 +76,24 @@ export default async function AdminStudentsPage() {
 								<thead className='bg-slate-50'>
 									<tr>
 										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>학생</th>
+										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>이메일</th>
 										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>연락처</th>
-										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>신청</th>
-										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>대기</th>
-										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>가능 슬롯</th>
+										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>생년월일</th>
+										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>카카오톡 ID</th>
+										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>거주지</th>
 										<th className='px-4 py-2 text-left text-xs font-semibold text-slate-600'>가입일</th>
 									</tr>
 								</thead>
 								<tbody className='divide-y divide-slate-100 bg-white'>
 									{studentRows.map((student) => {
-										const stat = appMap.get(student.id) ?? { total: 0, pending: 0 };
-										const slots = availabilityCount.get(student.id) ?? 0;
 										return (
 											<tr key={student.id} className='hover:bg-slate-50'>
 												<td className='px-4 py-2 font-semibold text-slate-900'>{student.name || '이름 미입력'}</td>
+												<td className='px-4 py-2 text-slate-700'>{student.email}</td>
 												<td className='px-4 py-2 text-slate-700'>{student.phone || '연락처 없음'}</td>
-												<td className='px-4 py-2 text-slate-700'>{stat.total}건</td>
-												<td className='px-4 py-2 text-[var(--primary)]'>{stat.pending}건</td>
-												<td className='px-4 py-2 text-slate-700'>{slots}개</td>
+												<td className='px-4 py-2 text-slate-700'>{student.birthdate ?? '미입력'}</td>
+												<td className='px-4 py-2 text-slate-700'>{student.kakao_id ?? '미입력'}</td>
+												<td className='px-4 py-2 text-slate-700'>{student.country ?? '미입력'}</td>
 												<td className='px-4 py-2 text-slate-500'>{formatDateTime(new Date(student.created_at))}</td>
 											</tr>
 										);

@@ -72,6 +72,15 @@ function getNextDateForDay(dayOfWeek: number, reference: Date, time: string) {
   return target;
 }
 
+export function combineDayAndTime(dayOfWeek: number, time: string, reference: Date) {
+  const [hour, minute] = time.split(":").map(Number);
+  const day = new Date(reference);
+  day.setHours(hour, minute, 0, 0);
+  const diff = (dayOfWeek + 7 - day.getDay()) % 7;
+  day.setDate(day.getDate() + diff);
+  return day;
+}
+
 export function buildSlotsFromDayTimeRanges(ranges: DayTimeRange[], options: { referenceDate?: Date } = {}) {
   const reference = options.referenceDate ?? new Date();
 
@@ -109,4 +118,33 @@ export function buildSlotsFromDayTimeRanges(ranges: DayTimeRange[], options: { r
       };
     })
     .filter(Boolean) as { start: string; end: string }[];
+}
+
+export function generateWindowOccurrences(
+  windows: { id: string; day_of_week: number; start_time: string; end_time: string }[],
+  options: { from: Date; to: Date }
+) {
+  const occurrences: { windowId: string; start: Date; end: Date }[] = [];
+  const start = new Date(options.from);
+  const endBoundary = new Date(options.to);
+  start.setHours(0, 0, 0, 0);
+  endBoundary.setHours(23, 59, 59, 999);
+
+  for (let day = new Date(start); day <= endBoundary; day.setDate(day.getDate() + 1)) {
+    const dow = day.getDay();
+    const matching = windows.filter((w) => w.day_of_week === dow);
+    matching.forEach((w) => {
+      const startAt = new Date(day);
+      const endAt = new Date(day);
+      const [sh, sm] = w.start_time.split(":").map(Number);
+      const [eh, em] = w.end_time.split(":").map(Number);
+      startAt.setHours(sh, sm, 0, 0);
+      endAt.setHours(eh, em, 0, 0);
+      if (startAt >= options.from && endAt <= endBoundary) {
+        occurrences.push({ windowId: w.id, start: startAt, end: endAt });
+      }
+    });
+  }
+
+  return occurrences.sort((a, b) => a.start.getTime() - b.start.getTime());
 }

@@ -1,6 +1,6 @@
 import { cancelApplication } from "@/app/actions/student";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { requireSession, requireRole } from "@/lib/auth";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/time";
@@ -33,9 +33,9 @@ export default async function StudentApplicationsPage() {
               </div>
               {app.status === "pending" && (
                 <form action={cancelApplication.bind(null, app.id)}>
-                  <Button variant="ghost" className="text-red-600" type="submit">
+                  <ConfirmSubmitButton variant="ghost" className="text-red-600">
                     취소
-                  </Button>
+                  </ConfirmSubmitButton>
                 </form>
               )}
             </div>

@@ -10,35 +10,44 @@ type TimeWindowField = {
   day_of_week: number;
   start_time: string;
   end_time: string;
+  instructor_id?: string;
+  instructor_name?: string;
+  capacity?: number;
 };
 
 const days = ["일", "월", "화", "수", "목", "금", "토"];
 const weekOptions = [1, 2, 3, 4, 6, 8, 12];
+type InstructorOption = { id: string; name: string | null; email: string | null };
 
-export function CourseScheduleFields() {
+interface Props {
+  instructors: InstructorOption[];
+}
+
+export function CourseScheduleFields({ instructors }: Props) {
   const idPrefix = useId();
-  const [isTimeFixed, setIsTimeFixed] = useState(false);
   const [windows, setWindows] = useState<TimeWindowField[]>(() => [
     {
       id: `${idPrefix}-0`,
       day_of_week: 1,
       start_time: "",
       end_time: "",
+      capacity: 1,
     },
   ]);
 
   const windowsPayload = useMemo(
     () =>
-      isTimeFixed
-        ? JSON.stringify(
-            windows.map(({ day_of_week, start_time, end_time }) => ({
-              day_of_week,
-              start_time,
-              end_time,
-            }))
-          )
-        : "",
-    [isTimeFixed, windows]
+      JSON.stringify(
+        windows.map(({ day_of_week, start_time, end_time, instructor_id, instructor_name, capacity }) => ({
+          day_of_week,
+          start_time,
+          end_time,
+          instructor_id,
+          instructor_name,
+          capacity: capacity ?? 1,
+        }))
+      ),
+    [windows]
   );
 
   const addWindow = () => {
@@ -49,6 +58,7 @@ export function CourseScheduleFields() {
         day_of_week: 1,
         start_time: "",
         end_time: "",
+        capacity: 1,
       },
     ]);
   };
@@ -58,27 +68,18 @@ export function CourseScheduleFields() {
   };
 
   const removeWindow = (id: string) => {
-    setWindows((prev) => (prev.length === 1 ? prev : prev.filter((w) => w.id !== id)));
+    setWindows((prev) => {
+      if (prev.length === 1) return prev;
+      if (!confirm("이 시간을 삭제하시겠습니까?")) return prev;
+      return prev.filter((w) => w.id !== id);
+    });
   };
 
   return (
     <div className="md:col-span-2 space-y-4 rounded-lg border border-slate-200 p-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-slate-800">수업 일정</p>
-          <p className="text-xs text-slate-600">
-            시간이 정해진 수업이면 요일과 시간대를 추가하고, 협의형이면 비워두세요.
-          </p>
-        </div>
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-[var(--primary)]"
-            checked={isTimeFixed}
-            onChange={(e) => setIsTimeFixed(e.target.checked)}
-          />
-          시간 확정됨
-        </label>
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-semibold text-slate-800">수업 일정</p>
+        <p className="text-xs text-slate-600">최소 1개 이상의 시간 범위를 등록해주세요. 정원과 담당 강사를 지정할 수 있습니다.</p>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -92,72 +93,107 @@ export function CourseScheduleFields() {
             ))}
           </Select>
         </div>
-        <input type="hidden" name="is_time_fixed" value={isTimeFixed ? "true" : "false"} />
         <input type="hidden" name="time_windows" value={windowsPayload} />
       </div>
 
-      {isTimeFixed && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-slate-800">고정 시간</p>
-            <Button type="button" variant="secondary" size="sm" onClick={addWindow}>
-              시간 추가
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            {windows.map((window, index) => (
-              <div
-                key={window.id}
-                className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 md:grid-cols-[1fr_1fr_1fr_auto]"
-              >
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-600">요일</label>
-                  <Select
-                    value={window.day_of_week.toString()}
-                    onChange={(e) => updateWindow(window.id, { day_of_week: Number(e.target.value) })}
-                  >
-                    {days.map((label, idx) => (
-                      <option key={label} value={idx}>
-                        {label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-600">시작</label>
-                  <Input
-                    type="time"
-                    value={window.start_time}
-                    onChange={(e) => updateWindow(window.id, { start_time: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-slate-600">종료</label>
-                  <Input
-                    type="time"
-                    value={window.end_time}
-                    onChange={(e) => updateWindow(window.id, { end_time: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="flex items-end justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="text-sm text-red-600"
-                    onClick={() => removeWindow(window.id)}
-                    disabled={windows.length === 1 && index === 0}
-                  >
-                    삭제
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium text-slate-800">가능 시간</p>
+          <Button type="button" variant="secondary" size="sm" onClick={addWindow}>
+            시간 추가
+          </Button>
         </div>
-      )}
+
+        <div className="space-y-2">
+          {windows.map((window, index) => (
+            <div
+              key={window.id}
+              className="grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-3 md:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]"
+            >
+              <div className="space-y-1">
+                <label className="text-xs text-slate-600">요일</label>
+                <Select
+                  value={window.day_of_week.toString()}
+                  onChange={(e) => updateWindow(window.id, { day_of_week: Number(e.target.value) })}
+                >
+                  {days.map((label, idx) => (
+                    <option key={label} value={idx}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-600">시작</label>
+                <Input
+                  type="time"
+                  value={window.start_time}
+                  onChange={(e) => updateWindow(window.id, { start_time: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-600">종료</label>
+                <Input
+                  type="time"
+                  value={window.end_time}
+                  onChange={(e) => updateWindow(window.id, { end_time: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-600">정원</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={window.capacity ?? 1}
+                  onChange={(e) => updateWindow(window.id, { capacity: Number(e.target.value) || 1 })}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-600">강사 선택</label>
+                <Select
+                  value={window.instructor_id ?? ""}
+                  onChange={(e) =>
+                    updateWindow(window.id, {
+                      instructor_id: e.target.value || undefined,
+                      instructor_name: e.target.value ? "" : window.instructor_name,
+                    })
+                  }
+                >
+                  <option value="">직접 입력 또는 미지정</option>
+                  {instructors.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.name ?? "이름 미입력"} ({inst.email ?? "이메일 없음"})
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-600">강사 이름(직접 입력)</label>
+                <Input
+                  placeholder="예: 외부 강사"
+                  value={window.instructor_name ?? ""}
+                  onChange={(e) => updateWindow(window.id, { instructor_name: e.target.value, instructor_id: e.target.value ? undefined : window.instructor_id })}
+                  disabled={Boolean(window.instructor_id)}
+                />
+              </div>
+              <div className="flex items-end justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-sm text-red-600"
+                  onClick={() => removeWindow(window.id)}
+                  disabled={windows.length === 1 && index === 0}
+                >
+                  삭제
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -14,20 +14,32 @@ export interface Database {
           id: string;
           role: "admin" | "student" | "instructor";
           name: string;
+          email: string;
           phone: string | null;
+          birthdate: string | null;
+          kakao_id: string | null;
+          country: string | null;
           created_at: string;
         };
         Insert: {
           id: string;
           role?: "admin" | "student" | "instructor";
           name?: string;
+          email?: string;
           phone?: string | null;
+          birthdate?: string | null;
+          kakao_id?: string | null;
+          country?: string | null;
           created_at?: string;
         };
         Update: {
           role?: "admin" | "student" | "instructor";
           name?: string;
+          email?: string;
           phone?: string | null;
+          birthdate?: string | null;
+          kakao_id?: string | null;
+          country?: string | null;
           created_at?: string;
         };
       };
@@ -38,7 +50,6 @@ export interface Database {
           subject: string;
           grade_range: string;
           description: string | null;
-          is_time_fixed: boolean;
           weeks: number;
           duration_minutes: number;
           capacity: number;
@@ -52,7 +63,6 @@ export interface Database {
           subject: string;
           grade_range: string;
           description?: string | null;
-          is_time_fixed?: boolean;
           weeks?: number;
           duration_minutes?: number;
           capacity?: number;
@@ -69,6 +79,9 @@ export interface Database {
           day_of_week: number;
           start_time: string;
           end_time: string;
+          instructor_id: string | null;
+          instructor_name: string | null;
+          capacity: number;
         };
         Insert: {
           id?: string;
@@ -76,6 +89,9 @@ export interface Database {
           day_of_week: number;
           start_time: string;
           end_time: string;
+          instructor_id?: string | null;
+          instructor_name?: string | null;
+          capacity?: number;
         };
         Update: Partial<Omit<Database["public"]["Tables"]["course_time_windows"]["Row"], "id" | "course_id">>;
       };
@@ -140,7 +156,8 @@ export interface Database {
           course_id: string;
           slot_start_at: string;
           slot_end_at: string;
-          instructor_id: string;
+          instructor_id: string | null;
+          instructor_name: string | null;
           status: "proposed" | "confirmed" | "rescheduled" | "cancelled";
           updated_by: string | null;
           note: string | null;
@@ -152,7 +169,8 @@ export interface Database {
           course_id: string;
           slot_start_at: string;
           slot_end_at: string;
-          instructor_id: string;
+          instructor_id?: string | null;
+          instructor_name?: string | null;
           status?: "proposed" | "confirmed" | "rescheduled" | "cancelled";
           updated_by?: string | null;
           note?: string | null;
@@ -160,6 +178,21 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Omit<Database["public"]["Tables"]["matches"]["Row"], "id" | "created_at">>;
+      };
+      application_time_choices: {
+        Row: {
+          id: string;
+          application_id: string;
+          window_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          application_id: string;
+          window_id: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<Database["public"]["Tables"]["application_time_choices"]["Row"], "id" | "application_id" | "window_id">>;
       };
       match_students: {
         Row: {

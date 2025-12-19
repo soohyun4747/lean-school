@@ -46,7 +46,11 @@ export function AvailabilityRequestFields({ fieldName = "availability_json" }: P
   };
 
   const removeRow = (id: string) => {
-    setRows((prev) => (prev.length === 1 ? prev : prev.filter((row) => row.id !== id)));
+    setRows((prev) => {
+      if (prev.length === 1) return prev;
+      if (!confirm("이 시간을 삭제하시겠습니까?")) return prev;
+      return prev.filter((row) => row.id !== id);
+    });
   };
 
   return (

@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { CourseScheduleFields } from "./course-schedule-fields";
 
-export function CourseCreateModal() {
+type InstructorOption = { id: string; name: string | null; email: string | null };
+
+interface Props {
+  instructors: InstructorOption[];
+}
+
+export function CourseCreateModal({ instructors }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -76,7 +82,7 @@ export function CourseCreateModal() {
                   </CardContent>
                 </Card>
 
-                <CourseScheduleFields />
+                <CourseScheduleFields instructors={instructors} />
 
                 <Card className="md:col-span-2">
                   <CardHeader>

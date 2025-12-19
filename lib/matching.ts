@@ -1,17 +1,12 @@
 // lib/matching.ts
 import { getSupabaseServerClient /*, getSupabaseAdminClient */ } from "@/lib/supabase/server";
-import type { Tables } from "@/types/database";
+import { generateWindowOccurrences } from "@/lib/time";
 
 interface RunMatchingParams {
   courseId: string;
   from: string;
   to: string;
   requestedBy: string;
-}
-
-interface SlotState {
-  slot: Tables<"availability_slots">;
-  remaining: number;
 }
 
 export async function runMatching({ courseId, from, to, requestedBy }: RunMatchingParams) {
@@ -53,104 +48,98 @@ export async function runMatching({ courseId, from, to, requestedBy }: RunMatchi
   };
 
   try {
-    const { data: applications, error: appsError } = await supabase
-      .from("applications")
-      .select("id, student_id, created_at")
-      .eq("course_id", courseId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: true });
+    const [{ data: windows, error: windowsError }, { data: applications, error: appsError }, { data: existingMatches, error: matchesError }] =
+      await Promise.all([
+        supabase
+          .from("course_time_windows")
+          .select("id, day_of_week, start_time, end_time, instructor_id, instructor_name, capacity")
+          .eq("course_id", courseId),
+        supabase
+          .from("applications")
+          .select("id, student_id, created_at, application_time_choices(window_id)")
+          .eq("course_id", courseId)
+          .eq("status", "pending")
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("matches")
+          .select("id, slot_start_at, slot_end_at, instructor_id, instructor_name, match_students(student_id)")
+          .eq("course_id", courseId)
+          .gte("slot_start_at", from)
+          .lte("slot_end_at", to),
+      ]);
 
+    if (windowsError) throw windowsError;
     if (appsError) throw appsError;
-
-    const { data: instructorSlots, error: instSlotsError } = await supabase
-      .from("availability_slots")
-      .select("id, user_id, start_at, end_at, capacity")
-      .eq("role", "instructor")
-      .eq("course_id", courseId)
-      .gte("start_at", from)
-      .lte("end_at", to)
-      .order("start_at", { ascending: true });
-
-    if (instSlotsError) throw instSlotsError;
-
-    const instructorSlotStates: Record<string, SlotState[]> = {};
-    instructorSlots?.forEach((slot) => {
-      const key = slot.start_at;
-      if (!instructorSlotStates[key]) instructorSlotStates[key] = [];
-      instructorSlotStates[key].push({ slot, remaining: slot.capacity });
-    });
-
-    const { data: currentMatches, error: matchesError } = await supabase
-      .from("matches")
-      .select("id, instructor_id")
-      .eq("course_id", courseId);
-
     if (matchesError) throw matchesError;
 
-    const instructorLoad: Record<string, number> = {};
-    currentMatches?.forEach((m) => {
-      instructorLoad[m.instructor_id] = (instructorLoad[m.instructor_id] ?? 0) + 1;
+    const windowMap = new Map((windows ?? []).map((w) => [w.id, w]));
+    const occurrences = generateWindowOccurrences(
+      (windows ?? []).map((w) => ({
+        id: w.id,
+        day_of_week: w.day_of_week,
+        start_time: w.start_time,
+        end_time: w.end_time,
+      })),
+      { from: new Date(from), to: new Date(to) }
+    );
+
+    const occurrenceStates = occurrences.map((occ) => {
+      const windowInfo = windowMap.get(occ.windowId)!;
+      const key = `${windowInfo.instructor_id ?? "none"}-${occ.start.toISOString()}`;
+      const match = existingMatches?.find((m) => m.slot_start_at === occ.start.toISOString() && (m.instructor_id ?? "none") === (windowInfo.instructor_id ?? "none"));
+      const remaining = (windowInfo.capacity ?? 1) - (match?.match_students?.length ?? 0);
+      return {
+        window: windowInfo,
+        start: occ.start,
+        end: occ.end,
+        key,
+        matchId: match?.id ?? null,
+        remaining: remaining > 0 ? remaining : 0,
+      };
     });
 
     let matchedCount = 0;
     let unmatchedCount = 0;
 
     for (const app of applications ?? []) {
-      const { data: studentSlots, error: studentSlotsError } = await supabase
-        .from("availability_slots")
-        .select("id, start_at, end_at")
-        .eq("role", "student")
-        .eq("course_id", courseId)
-        .eq("user_id", app.student_id)
-        .gte("start_at", from)
-        .lte("end_at", to)
-        .order("start_at", { ascending: true });
-
-      if (studentSlotsError) throw studentSlotsError;
-
+      const choices = (app.application_time_choices ?? []).map((c) => c.window_id);
       let matched = false;
 
-      for (const s of studentSlots ?? []) {
-        const candidateSlots = (instructorSlotStates[s.start_at] ?? []).filter(
-          (x) => x.remaining > 0
-        );
+      for (const windowId of choices) {
+        const candidates = occurrenceStates
+          .filter((occ) => occ.window.id === windowId && occ.remaining > 0)
+          .sort((a, b) => a.start.getTime() - b.start.getTime());
 
-        if (candidateSlots.length === 0) continue;
+        if (candidates.length === 0) continue;
 
-        candidateSlots.sort((a, b) => {
-          if (a.remaining === b.remaining) {
-            const loadA = instructorLoad[a.slot.user_id] ?? 0;
-            const loadB = instructorLoad[b.slot.user_id] ?? 0;
-            return loadA - loadB;
-          }
-          return a.remaining - b.remaining;
-        });
+        const picked = candidates[0];
 
-        const picked = candidateSlots[0];
-
-        const { data: match, error: matchUpsertError } = await supabase
-          .from("matches")
-          .upsert(
-            {
+        let matchId = picked.matchId;
+        if (!matchId) {
+          const { data: match, error: matchInsertError } = await supabase
+            .from("matches")
+            .insert({
               course_id: courseId,
-              slot_start_at: s.start_at,
-              slot_end_at: s.end_at,
-              instructor_id: picked.slot.user_id,
+              slot_start_at: picked.start.toISOString(),
+              slot_end_at: picked.end.toISOString(),
+              instructor_id: picked.window.instructor_id,
+              instructor_name: picked.window.instructor_name,
               status: "confirmed",
               updated_by: requestedBy,
-            },
-            { onConflict: "course_id,slot_start_at,instructor_id" }
-          )
-          .select("id")
-          .single();
+            })
+            .select("id")
+            .single();
 
-        if (matchUpsertError || !match?.id) {
-          continue;
+          if (matchInsertError || !match?.id) {
+            continue;
+          }
+          matchId = match.id;
+          picked.matchId = match.id;
         }
 
         const insertRes = await supabase
           .from("match_students")
-          .insert({ match_id: match.id, student_id: app.student_id });
+          .insert({ match_id: matchId, student_id: app.student_id });
 
         if (insertRes.error) {
           continue;
@@ -159,8 +148,6 @@ export async function runMatching({ courseId, from, to, requestedBy }: RunMatchi
         await supabase.from("applications").update({ status: "matched" }).eq("id", app.id);
 
         picked.remaining -= 1;
-        instructorLoad[picked.slot.user_id] = (instructorLoad[picked.slot.user_id] ?? 0) + 1;
-
         matchedCount += 1;
         matched = true;
         break;
