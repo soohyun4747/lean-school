@@ -8,6 +8,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { formatDateTime } from "@/lib/time";
 import { removeStudentFromMatch } from "@/app/actions/admin";
 import type { ICourse } from "../page";
+import { Button } from "@/components/ui/button";
 
 type ApplicationRow = {
   id: string;
@@ -236,6 +237,15 @@ export default async function AdminCourseDetailPage({
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>가능한 시간표 생성</CardTitle>
+          <Button>생성하기</Button>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          
         </CardContent>
       </Card>
 
