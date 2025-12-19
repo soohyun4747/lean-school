@@ -405,9 +405,11 @@ export async function generateScheduleProposals(
 		(app) => app.status === 'pending'
 	);
 
+	// === 학생 birthdate 로드 ===
 	const pendingStudentIds = Array.from(
 		new Set(pendingApplications.map((app) => app.student_id))
 	);
+
 	const { data: profileRows } = pendingStudentIds.length
 		? await supabase
 				.from('profiles')
@@ -419,35 +421,68 @@ export async function generateScheduleProposals(
 		(profileRows ?? []).map((p) => [p.id, p.birthdate])
 	);
 
-	const sortedWindows =
-		windows?.slice().sort((a, b) => {
-			if (a.day_of_week !== b.day_of_week)
-				return a.day_of_week - b.day_of_week;
-			return a.start_time.localeCompare(b.start_time);
-		}) ?? [];
+	// ✅ window별 수요(해당 window를 선택한 pending 학생 수) 집계
+	const demandByWindowId = new Map<string, number>();
+	for (const app of pendingApplications) {
+		const choices = app.application_time_choices ?? [];
+		// 같은 학생이 같은 window를 중복 저장했을 가능성 방어
+		const uniqueWindowIds = new Set(choices.map((c) => c.window_id));
+		for (const wid of uniqueWindowIds) {
+			demandByWindowId.set(wid, (demandByWindowId.get(wid) ?? 0) + 1);
+		}
+	}
+
+	const maxDemand =
+		windows && windows.length
+			? Math.max(...windows.map((w) => demandByWindowId.get(w.id) ?? 0))
+			: 0;
+
+	// ✅ 인기 시간대가 1개 이상이면(= maxDemand > 0) 인기 window 전부만 추천
+	// ✅ 아니면 기존처럼 전체 window를 요일/시간 순으로 추천
+	const targetWindows =
+		(windows ?? [])
+			.slice()
+			.filter((w) =>
+				maxDemand > 0
+					? (demandByWindowId.get(w.id) ?? 0) === maxDemand
+					: true
+			)
+			.sort((a, b) => {
+				// 인기 모드에서는 demand가 전부 같으니 요일/시간 정렬
+				if (a.day_of_week !== b.day_of_week)
+					return a.day_of_week - b.day_of_week;
+				return a.start_time.localeCompare(b.start_time);
+			}) ?? [];
 
 	const reference = new Date();
 	const proposals: ScheduleProposal[] = [];
-	const assignedStudents = new Set<string>();
 
-	for (const window of sortedWindows) {
+	// maxDemand > 0 (인기 모드): window마다 독립적으로 후보를 뽑아 “다 추천”
+	// maxDemand === 0 (일반 모드): 기존처럼 학생 중복배정 방지
+	const assignedStudents = new Set<string>();
+	const useAssignedStudents = maxDemand === 0;
+
+	for (const window of targetWindows) {
 		const candidates = pendingApplications
-			.filter(
-				(app) =>
-					!assignedStudents.has(app.student_id) &&
-					(app.application_time_choices ?? []).some(
-						(choice) => choice.window_id === window.id
-					)
-			)
+			.filter((app) => {
+				if (useAssignedStudents && assignedStudents.has(app.student_id))
+					return false;
+				return (app.application_time_choices ?? []).some(
+					(choice) => choice.window_id === window.id
+				);
+			})
 			.map((app) => ({
 				application: app,
 				age: calculateAge(profileMap.get(app.student_id) ?? null),
 			}))
 			.sort((a, b) => {
+				// 1) 선착순
 				const createdDiff =
 					new Date(a.application.created_at).getTime() -
 					new Date(b.application.created_at).getTime();
 				if (createdDiff !== 0) return createdDiff;
+
+				// 2) 동률이면 나이 많은 학생 우선 (birthdate 없는 경우 뒤로)
 				if (a.age === null && b.age === null) return 0;
 				if (a.age === null) return 1;
 				if (b.age === null) return -1;
@@ -468,9 +503,11 @@ export async function generateScheduleProposals(
 		const capacity = window.capacity ?? course.capacity;
 		const selected = candidates.slice(0, capacity);
 
-		selected.forEach((item) =>
-			assignedStudents.add(item.application.student_id)
-		);
+		if (useAssignedStudents) {
+			selected.forEach((item) =>
+				assignedStudents.add(item.application.student_id)
+			);
+		}
 
 		proposals.push({
 			window_id: window.id,
@@ -671,7 +708,9 @@ export async function confirmScheduleFromProposal(
 
 	if (matchError || !match?.id) {
 		console.error('confirm schedule insert error', matchError);
-		return { error: '일정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.' };
+		return {
+			error: '일정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.',
+		};
 	}
 
 	const { error: studentsError } = await supabase
