@@ -24,7 +24,6 @@ export default function LoginPage() {
 			setError(signInError.message);
 			return;
 		}
-    console.log(data);
     
 		if (data.user.user_metadata.role === 'admin') {
 			router.push('/admin/courses');

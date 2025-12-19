@@ -13,7 +13,7 @@ export default async function StudentTimetablePage() {
 	const { data: rows, error } = await supabase
 		.from('matches')
 		.select(
-			'id, course_id, slot_start_at, slot_end_at, instructor_id, status, course:courses(title), match_students!inner(student_id)'
+			'id, course_id, slot_start_at, slot_end_at, instructor_id, instructor_name, status, course:courses(title), match_students!inner(student_id)'
 		)
 		.eq('match_students.student_id', profile.id)
 		.order('slot_start_at', { ascending: true });
@@ -28,6 +28,7 @@ export default async function StudentTimetablePage() {
 		slot_start_at: string;
 		slot_end_at: string;
 		instructor_id: string | null;
+		instructor_name: string | null;
 		status: string;
 		course: { title?: string } | null;
 		match_students: { student_id: string }[];
@@ -38,9 +39,7 @@ export default async function StudentTimetablePage() {
 
 	const instructorIds = Array.from(
 		new Set(
-			matchRows
-				.map((r) => r.instructor_id)
-				.filter(Boolean) as string[]
+			matchRows.map((r) => r.instructor_id).filter(Boolean) as string[]
 		)
 	);
 	const { data: instructors } = instructorIds.length
@@ -54,8 +53,7 @@ export default async function StudentTimetablePage() {
 	);
 
 	const visibleMatches = matchRows.filter(
-		(row) =>
-			row.status !== 'proposed' && row.status !== 'cancelled'
+		(row) => row.status !== 'proposed' && row.status !== 'cancelled'
 	);
 
 	return (
@@ -71,10 +69,7 @@ export default async function StudentTimetablePage() {
 						</p>
 					)}
 					{visibleMatches.map((row) => {
-						const instructorName =
-							(row.instructor_id &&
-								instructorMap.get(row.instructor_id)) ||
-							row.instructor_id;
+						const instructorName = row.instructor_name;
 						return (
 							<div
 								key={row.id}
@@ -83,7 +78,9 @@ export default async function StudentTimetablePage() {
 									{row.course?.title ?? '수업'}
 								</p>
 								<p className='text-xs text-slate-600'>
-									{formatDateTime(new Date(row.slot_start_at))}
+									{formatDateTime(
+										new Date(row.slot_start_at)
+									)}
 								</p>
 								<p className='text-xs text-slate-700'>
 									강사: {instructorName ?? '미정'}

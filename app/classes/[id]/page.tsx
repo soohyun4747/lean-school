@@ -203,7 +203,7 @@ export default async function StudentCourseDetail({
 							className='space-y-4'>
 							<div className='space-y-3'>
 								<p className='text-sm text-slate-700'>
-									가능한 시간대를 선택해주세요. 여러 개를
+									가능한 한국 시간대를 선택해주세요. 여러 개를
 									선택할 수 있습니다.
 								</p>
 								{slotOptions.length === 0 && (
