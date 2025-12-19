@@ -3,18 +3,20 @@ import { requireSession, requireRole } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { formatDateTime } from '@/lib/time';
 
+export const dynamic = 'force-dynamic';
+
 export default async function StudentTimetablePage() {
 	const { profile } = await requireSession();
 	requireRole(profile.role, ['student']);
 	const supabase = await getSupabaseServerClient();
 
 	const { data: rows, error } = await supabase
-		.from('match_students')
+		.from('matches')
 		.select(
-			'id, match:matches(id, course_id, slot_start_at, slot_end_at, instructor_id, status, courses(title))'
+			'id, course_id, slot_start_at, slot_end_at, instructor_id, status, course:courses(title), match_students!inner(student_id)'
 		)
-		.eq('student_id', profile.id)
-		.order('created_at', { ascending: false });
+		.eq('match_students.student_id', profile.id)
+		.order('slot_start_at', { ascending: true });
 
 	if (error) {
 		console.error(error);
@@ -22,15 +24,13 @@ export default async function StudentTimetablePage() {
 
 	type StudentMatchRow = {
 		id: string;
-		match: {
-			id: string;
-			course_id: string;
-			slot_start_at: string;
-			slot_end_at: string;
-			instructor_id: string;
-			status: string;
-			courses?: { title?: string } | null;
-		} | null;
+		course_id: string;
+		slot_start_at: string;
+		slot_end_at: string;
+		instructor_id: string | null;
+		status: string;
+		course: { title?: string } | null;
+		match_students: { student_id: string }[];
 	};
 
 	const matchRows: StudentMatchRow[] =
@@ -39,7 +39,7 @@ export default async function StudentTimetablePage() {
 	const instructorIds = Array.from(
 		new Set(
 			matchRows
-				.map((r) => r.match?.instructor_id)
+				.map((r) => r.instructor_id)
 				.filter(Boolean) as string[]
 		)
 	);
@@ -55,9 +55,7 @@ export default async function StudentTimetablePage() {
 
 	const visibleMatches = matchRows.filter(
 		(row) =>
-			row.match &&
-			row.match.status !== 'proposed' &&
-			row.match.status !== 'cancelled'
+			row.status !== 'proposed' && row.status !== 'cancelled'
 	);
 
 	return (
@@ -72,28 +70,30 @@ export default async function StudentTimetablePage() {
 							아직 확정된 매칭이 없습니다.
 						</p>
 					)}
-					{visibleMatches.map((row) => (
-						<div
-							key={row.id}
-							className='rounded-md border border-slate-200 px-4 py-3'>
-							<p className='text-sm font-semibold text-slate-900'>
-								{row.match?.courses?.title ?? '수업'}
-							</p>
-							<p className='text-xs text-slate-600'>
-								{formatDateTime(
-									new Date(row.match?.slot_start_at)
-								)}
-							</p>
-							<p className='text-xs text-slate-700'>
-								강사:{' '}
-								{instructorMap.get(row.match?.instructor_id) ??
-									row.match?.instructor_id}
-							</p>
-							<p className='text-xs text-slate-500'>
-								상태: {row.match?.status}
-							</p>
-						</div>
-					))}
+					{visibleMatches.map((row) => {
+						const instructorName =
+							(row.instructor_id &&
+								instructorMap.get(row.instructor_id)) ||
+							row.instructor_id;
+						return (
+							<div
+								key={row.id}
+								className='rounded-md border border-slate-200 px-4 py-3'>
+								<p className='text-sm font-semibold text-slate-900'>
+									{row.course?.title ?? '수업'}
+								</p>
+								<p className='text-xs text-slate-600'>
+									{formatDateTime(new Date(row.slot_start_at))}
+								</p>
+								<p className='text-xs text-slate-700'>
+									강사: {instructorName ?? '미정'}
+								</p>
+								<p className='text-xs text-slate-500'>
+									상태: {row.status}
+								</p>
+							</div>
+						);
+					})}
 				</CardContent>
 			</Card>
 		</div>

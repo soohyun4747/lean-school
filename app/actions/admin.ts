@@ -741,6 +741,48 @@ export async function confirmScheduleFromProposal(
 	return { success: '일정을 확정했습니다.' };
 }
 
+export async function deleteMatchSchedule(
+	courseId: string,
+	matchId: string
+) {
+	const { profile } = await requireSession();
+	requireRole(profile.role, ['admin']);
+	const supabase = await getSupabaseServerClient();
+
+	const { data: match } = await supabase
+		.from('matches')
+		.select('course_id')
+		.eq('id', matchId)
+		.single();
+
+	if (!match || match.course_id !== courseId) {
+		throw new Error('매칭을 찾을 수 없습니다.');
+	}
+
+	const { data: students } = await supabase
+		.from('match_students')
+		.select('student_id')
+		.eq('match_id', matchId);
+
+	await supabase.from('matches').delete().eq('id', matchId);
+
+	if (students?.length) {
+		await supabase
+			.from('applications')
+			.update({ status: 'pending' })
+			.eq('course_id', courseId)
+			.in(
+				'student_id',
+				students.map((s) => s.student_id)
+			);
+	}
+
+	revalidatePath(`/admin/courses/${courseId}`);
+	revalidatePath('/admin/courses');
+	revalidatePath('/student/applications');
+	revalidatePath('/student/timetable');
+}
+
 export async function sendEmailBatch(formData: FormData) {
 	const { profile } = await requireSession();
 	requireRole(profile.role, ['admin']);

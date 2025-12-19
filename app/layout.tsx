@@ -19,6 +19,8 @@ export const metadata: Metadata = {
   description: "학생-강사 온라인 수업 매칭 MVP",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{

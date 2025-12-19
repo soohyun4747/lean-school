@@ -9,6 +9,7 @@ import { formatDateTime, formatDayTime } from '@/lib/time';
 import {
 	addStudentToMatch,
 	removeStudentFromMatch,
+	deleteMatchSchedule,
 } from '@/app/actions/admin';
 import type { ICourse } from '../page';
 import { Button } from '@/components/ui/button';
@@ -313,9 +314,23 @@ export default async function AdminCourseDetailPage({
 												  '미지정'}
 										</p>
 									</div>
-									<Badge variant={badgeVariant(match.status)}>
-										확정됨
-									</Badge>
+									<div className='flex items-center gap-2'>
+										<Badge variant={badgeVariant(match.status)}>
+											확정됨
+										</Badge>
+										<form
+											action={deleteMatchSchedule.bind(
+												null,
+												course.id,
+												match.id
+											)}>
+											<ConfirmSubmitButton
+												variant='ghost'
+												className='text-xs text-red-600'>
+												일정 삭제
+											</ConfirmSubmitButton>
+										</form>
+									</div>
 								</div>
 
 								<div className='space-y-2'>

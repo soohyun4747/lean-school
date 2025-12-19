@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { requireSession, requireRole } from '@/lib/auth';
@@ -45,6 +46,18 @@ export default async function StudentCourseDetail({
 		console.error({ error });
 	}
 
+	const { data: existingApps } = await supabase
+		.from('applications')
+		.select('id, status')
+		.eq('course_id', course.id)
+		.eq('student_id', profile.id)
+		.order('created_at', { ascending: false })
+		.limit(1);
+
+	const existingApplication = existingApps?.[0] ?? null;
+	const hasActiveApplication =
+		existingApplication && existingApplication.status !== 'cancelled';
+
 	async function action(formData: FormData) {
 		'use server';
 		const selected = formData
@@ -84,6 +97,16 @@ export default async function StudentCourseDetail({
 				];
 			}
 		}) ?? [];
+
+	const slotsByDay = slotOptions.reduce(
+		(acc, slot) => {
+			const list = acc.get(slot.day_of_week) ?? [];
+			list.push(slot);
+			acc.set(slot.day_of_week, list);
+			return acc;
+		},
+		new Map<number, typeof slotOptions>()
+	);
 
 	return (
 		<div className='grid gap-6 lg:grid-cols-[1.1fr_0.9fr] mx-auto max-w-6xl px-4 py-12 space-y-8'>
@@ -130,6 +153,22 @@ export default async function StudentCourseDetail({
 						</p>
 					)}
 				</div>
+				{hasActiveApplication && (
+					<div className='space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800'>
+						<p className='font-semibold'>
+							이미 이 수업을 신청하셨습니다.
+						</p>
+						<p>
+							현재 상태: {existingApplication.status}. 신청
+							내역에서 취소한 뒤 다시 신청할 수 있습니다.
+						</p>
+						<Link
+							href='/student/applications'
+							className='font-semibold underline'>
+							신청 내역으로 이동하기
+						</Link>
+					</div>
+				)}
 				{/* <Card>
 					<CardHeader>
 						<CardTitle>가능 시간 범위</CardTitle>
@@ -173,35 +212,43 @@ export default async function StudentCourseDetail({
 										않았습니다.
 									</p>
 								)}
-								<div className='space-y-2'>
-									{slotOptions.map((slot) => (
-										<label
-											key={slot.value}
-											className='flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm'>
-											<div className='flex items-center gap-3'>
-												<input
-													type='checkbox'
-													name='window_ids'
-													value={slot.value}
-													className='h-4 w-4 accent-[var(--primary)]'
-												/>
-												<div>
-													<p className='font-semibold text-slate-900'>
-														{days[slot.day_of_week]}{' '}
-														{slot.start_time} -{' '}
-														{slot.end_time}
-													</p>
-													<p className='text-xs text-slate-600'>
-														강사:{' '}
-														{slot.instructor_label}{' '}
-														· 정원 {course.capacity}
-														명
-													</p>
-												</div>
+								{Array.from(slotsByDay.entries()).map(
+									([dayIndex, slots]) => (
+										<div
+											key={dayIndex}
+											className='space-y-2 rounded-lg border border-slate-200 p-3'>
+											<p className='text-sm font-semibold text-slate-800'>
+												{days[dayIndex]}
+											</p>
+											<div className='space-y-2'>
+												{slots.map((slot) => (
+													<label
+														key={slot.value}
+														className='flex items-center justify-between rounded-md border border-slate-100 px-3 py-2 text-sm'>
+														<div className='flex items-center gap-3'>
+															<input
+																type='checkbox'
+																name='window_ids'
+																value={slot.value}
+																className='h-4 w-4 accent-[var(--primary)]'
+																disabled={hasActiveApplication}
+															/>
+															<div>
+																<p className='font-semibold text-slate-900'>
+																	{slot.start_time} - {slot.end_time}
+																</p>
+																<p className='text-xs text-slate-600'>
+																	강사: {slot.instructor_label} · 정원 {course.capacity}
+																	명
+																</p>
+															</div>
+														</div>
+													</label>
+												))}
 											</div>
-										</label>
-									))}
-								</div>
+										</div>
+									)
+								)}
 								<p className='text-xs text-slate-600'>
 									선택한 시간 기준으로 신청이 접수됩니다.
 								</p>
@@ -209,8 +256,13 @@ export default async function StudentCourseDetail({
 							<Button
 								type='submit'
 								className='w-full'
-								disabled={slotOptions.length === 0}>
-								신청하기
+								disabled={
+									slotOptions.length === 0 ||
+									hasActiveApplication
+								}>
+								{hasActiveApplication
+									? '이미 신청 완료됨'
+									: '신청하기'}
 							</Button>
 						</form>
 					</CardContent>

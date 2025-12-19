@@ -47,6 +47,19 @@ export async function applyToCourse(courseId: string, windowIds: string[]) {
 		throw new Error('선택한 시간이 유효하지 않습니다.');
 	}
 
+	const { data: existing } = await supabase
+		.from('applications')
+		.select('id, status')
+		.eq('course_id', courseId)
+		.eq('student_id', session!.user.id)
+		.order('created_at', { ascending: false })
+		.limit(1);
+
+	const existingApplication = existing?.[0] ?? null;
+	if (existingApplication && existingApplication.status !== 'cancelled') {
+		throw new Error('이미 이 수업에 신청하셨습니다.');
+	}
+
 	const windowMap = new Map(windows.map((w) => [w.id, w]));
 	const finalWindowIds: string[] = [];
 
@@ -72,22 +85,54 @@ export async function applyToCourse(courseId: string, windowIds: string[]) {
 
 	const windowSet = Array.from(new Set(finalWindowIds));
 
-	const { data: application, error: applicationsErr } = await supabase
-		.from('applications')
-		.insert({ course_id: courseId, student_id: session!.user.id })
-		.select('id')
-		.single();
+	let applicationId: string | null = null;
 
-	if (applicationsErr) {
-		console.error({ applicationsErr });
-		if (applicationsErr?.code === '23505') {
-			throw new Error('이미 이 수업에 신청하셨습니다.');
+	if (existingApplication?.id && existingApplication.status === 'cancelled') {
+		const { error: updateError } = await supabase
+			.from('applications')
+			.update({
+				status: 'pending',
+				created_at: new Date().toISOString(),
+			})
+			.eq('id', existingApplication.id)
+			.eq('student_id', session!.user.id);
+
+		if (updateError) {
+			console.error({ updateError });
+			throw new Error('신청을 다시 저장하는 데 실패했습니다.');
 		}
+
+		await supabase
+			.from('application_time_choices')
+			.delete()
+			.eq('application_id', existingApplication.id);
+
+		applicationId = existingApplication.id;
 	}
 
-	if (application?.id) {
+	if (!applicationId) {
+		const { data: application, error: applicationsErr } = await supabase
+			.from('applications')
+			.insert({ course_id: courseId, student_id: session!.user.id })
+			.select('id')
+			.single();
+
+		if (applicationsErr) {
+			console.error({ applicationsErr });
+			if (applicationsErr?.code === '23505') {
+				throw new Error('이미 이 수업에 신청하셨습니다.');
+			}
+			throw new Error(
+				'신청을 저장하는 중 오류가 발생했습니다. 다시 시도해주세요.'
+			);
+		}
+
+		applicationId = application?.id ?? null;
+	}
+
+	if (applicationId) {
 		const choiceRows = windowSet.map((wid) => ({
-			application_id: application.id,
+			application_id: applicationId,
 			window_id: wid,
 		}));
 		const { error: choiceError } = await supabase
@@ -120,7 +165,8 @@ export async function applyToCourse(courseId: string, windowIds: string[]) {
 	revalidatePath('/student/applications');
 	revalidatePath(`/admin/courses/${courseId}`);
 	revalidatePath('/admin/courses');
-	return application?.id;
+	revalidatePath('/student/timetable');
+	return applicationId;
 }
 
 export async function cancelApplication(applicationId: string) {
