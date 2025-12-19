@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Role } from '@/lib/auth';
 import type { Tables } from '@/types/database';
@@ -20,7 +21,7 @@ export async function SiteHeader() {
 	}
 
   console.log({profile});
-  
+
 
 	const menuByRole: Record<Role, { href: string; label: string }[]> = {
 		admin: [
@@ -48,8 +49,18 @@ export async function SiteHeader() {
 				<div className='flex items-center gap-6'>
 					<Link
 						href='/'
-						className='text-xl font-bold text-[var(--primary)]'>
-						린스쿨
+						className='flex items-center gap-2 text-xl font-bold text-[var(--primary)]'>
+						<span className='flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-[var(--primary-soft)] bg-white shadow-sm'>
+							<Image
+								src='/logo.png'
+								alt='린스쿨 로고'
+								width={40}
+								height={40}
+								className='h-full w-full object-contain'
+								priority
+							/>
+						</span>
+						<span className='hidden sm:inline'>린스쿨</span>
 					</Link>
 					<nav className='flex flex-wrap items-center gap-3 text-sm font-medium text-slate-700'>
 						<Link
