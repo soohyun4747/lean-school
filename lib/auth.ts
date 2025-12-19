@@ -47,6 +47,6 @@ export async function requireSession() {
 
 export function requireRole(profileRole: Role, allowed: Role[]) {
 	if (!allowed.includes(profileRole)) {
-		redirect('/dashboard');
+		redirect('/auth/login');
 	}
 }

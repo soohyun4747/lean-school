@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { startTransition, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -24,16 +24,21 @@ export default function LoginPage() {
 			setError(signInError.message);
 			return;
 		}
-    
-		if (data.user.user_metadata.role === 'admin') {
-			router.push('/admin/courses');
-		}
-		if (data.user.user_metadata.role === 'student') {
-			router.push('/student/applications');
-		}
-		if (data.user.user_metadata.role === 'instructor') {
-			router.push('/instructor/timetable');
-		}
+
+		const role = data.user.user_metadata.role;
+
+		const target =
+			role === 'admin'
+				? '/admin/courses'
+				: role === 'student'
+				? '/student/applications'
+				: '/instructor/timetable';
+
+		// ✅ 핵심: push 후 refresh (또는 refresh 후 push도 가능)
+		startTransition(() => {
+			router.push(target);
+			router.refresh();
+		});
 	};
 
 	return (

@@ -19,21 +19,24 @@ export async function SiteHeader() {
 		}
 	}
 
+  console.log({profile});
+  
+
 	const menuByRole: Record<Role, { href: string; label: string }[]> = {
 		admin: [
 			{ href: '/admin/courses', label: '수업 관리' },
 			{ href: '/admin/students', label: '학생 관리' },
 			{ href: '/admin/instructors', label: '강사 관리' },
-      { href: '/admin/landing', label: '랜딩 이미지' },
+			{ href: '/admin/landing', label: '랜딩 이미지' },
 		],
-	student: [
-		{ href: '/student/applications', label: '신청 현황' },
-		{ href: '/student/timetable', label: '시간표' },
-	],
-	instructor: [
-		{ href: '/instructor/subjects', label: '가능 과목' },
-		{ href: '/instructor/timetable', label: '시간표' },
-	],
+		student: [
+			{ href: '/student/applications', label: '신청 현황' },
+			{ href: '/student/timetable', label: '시간표' },
+		],
+		instructor: [
+			{ href: '/instructor/subjects', label: '가능 과목' },
+			{ href: '/instructor/timetable', label: '시간표' },
+		],
 	};
 
 	const roleMenu = profile ? menuByRole[profile.role] : [];

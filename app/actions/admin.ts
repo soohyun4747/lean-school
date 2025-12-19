@@ -834,7 +834,3 @@ export async function removeStudentFromMatch(
 	revalidatePath(`/admin/courses/${courseId}`);
 	revalidatePath('/admin/courses');
 }
-
-export async function redirectToDashboard() {
-	redirect('/dashboard');
-}
