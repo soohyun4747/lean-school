@@ -8,15 +8,12 @@ import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { formatDateTime } from '@/lib/time';
 import {
 	addStudentToMatch,
-	confirmMatchSchedule,
-	generateScheduleProposals,
 	removeStudentFromMatch,
-	updateProposedMatch,
 } from '@/app/actions/admin';
 import type { ICourse } from '../page';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import ScheduleProposalGenerator from '@/components/features/schedule-proposal-generator';
 
 type ApplicationRow = {
 	id: string;
@@ -108,13 +105,14 @@ export default async function AdminCourseDetailPage({
 	const { data: profiles } = profileIds.size
 		? await supabase
 				.from('profiles')
-				.select('id, name, phone')
+				.select('id, name, phone, birthdate')
 				.in('id', Array.from(profileIds))
 		: {
 				data: [] as {
 					id: string;
 					name: string | null;
 					phone: string | null;
+					birthdate: string | null;
 				}[],
 		  };
 	const profileMap = new Map(profiles?.map((p) => [p.id, p]));
@@ -150,15 +148,7 @@ export default async function AdminCourseDetailPage({
 		if (status === 'cancelled') return 'danger';
 		return 'info';
 	};
-	const toDateTimeLocalValue = (iso: string) => {
-		const date = new Date(iso);
-		const local = new Date(
-			date.getTime() - date.getTimezoneOffset() * 60000
-		);
-		return local.toISOString().slice(0, 16);
-	};
-	const proposedMatches = matchRows.filter((m) => m.status === 'proposed');
-	const finalizedMatches = matchRows.filter((m) => m.status !== 'proposed');
+	const confirmedMatches = matchRows.filter((m) => m.status !== 'proposed');
 	const studentOptions = Array.from(
 		new Set(applicationRows.map((app) => app.student_id))
 	).map((id) => ({
@@ -269,30 +259,29 @@ export default async function AdminCourseDetailPage({
 				</CardContent>
 			</Card>
 			<Card>
-				<CardHeader className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-					<div className='space-y-1'>
-						<CardTitle>가능한 시간표 생성</CardTitle>
-						<p className='text-sm text-slate-600'>
-							신청한 시간대와 정원을 기준으로 추천 시간표를 만들고
-							수정한 뒤 확정할 수 있습니다.
-						</p>
-					</div>
-					<form
-						action={generateScheduleProposals.bind(
-							null,
-							course.id
-						)}>
-						<Button type='submit'>생성하기</Button>
-					</form>
+				<ScheduleProposalGenerator
+					course={{
+						id: course.id,
+						capacity: course.capacity,
+						duration_minutes: course.duration_minutes,
+					}}
+					windows={windowsRows}
+					applications={applicationRows}
+					profiles={profiles ?? []}
+				/>
+			</Card>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>확정된 일정</CardTitle>
 				</CardHeader>
 				<CardContent className='space-y-4 text-sm'>
-					{proposedMatches.length === 0 && (
+					{confirmedMatches.length === 0 && (
 						<p className='text-slate-600'>
-							아직 제안된 시간표가 없습니다. 생성하기 버튼을 눌러
-							추천 일정을 받아보세요.
+							아직 확정된 일정이 없습니다.
 						</p>
 					)}
-					{proposedMatches.map((match) => {
+					{confirmedMatches.map((match) => {
 						const assignedIds = new Set(
 							match.match_students.map((ms) => ms.student_id)
 						);
@@ -325,46 +314,9 @@ export default async function AdminCourseDetailPage({
 										</p>
 									</div>
 									<Badge variant={badgeVariant(match.status)}>
-										제안됨
+										확정됨
 									</Badge>
 								</div>
-								<form
-									action={updateProposedMatch.bind(
-										null,
-										course.id
-									)}
-									className='grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end'>
-									<input
-										type='hidden'
-										name='match_id'
-										value={match.id}
-									/>
-									<label className='space-y-1 text-xs font-semibold text-slate-700'>
-										<span className='block'>시작</span>
-										<Input
-											type='datetime-local'
-											name='slot_start_at'
-											defaultValue={toDateTimeLocalValue(
-												match.slot_start_at
-											)}
-										/>
-									</label>
-									<label className='space-y-1 text-xs font-semibold text-slate-700'>
-										<span className='block'>종료</span>
-										<Input
-											type='datetime-local'
-											name='slot_end_at'
-											defaultValue={toDateTimeLocalValue(
-												match.slot_end_at
-											)}
-										/>
-									</label>
-									<Button
-										type='submit'
-										className='w-full sm:w-auto'>
-										시간 저장
-									</Button>
-								</form>
 
 								<div className='space-y-2'>
 									<p className='text-xs font-semibold text-slate-700'>
@@ -444,25 +396,6 @@ export default async function AdminCourseDetailPage({
 										학생 추가
 									</Button>
 								</form>
-
-								<div className='flex justify-end'>
-									<form
-										action={confirmMatchSchedule.bind(
-											null,
-											course.id,
-											match.id
-										)}>
-										<Button
-											type='submit'
-											variant='secondary'
-											disabled={
-												match.match_students.length ===
-												0
-											}>
-											확정
-										</Button>
-									</form>
-								</div>
 							</div>
 						);
 					})}

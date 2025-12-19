@@ -330,7 +330,30 @@ export async function runMatchingAction(
 	}
 }
 
-export async function generateScheduleProposals(courseId: string) {
+export type ScheduleProposalStudent = {
+	student_id: string;
+	application_id: string;
+};
+
+export type ScheduleProposal = {
+	window_id: string;
+	slot_start_at: string;
+	slot_end_at: string;
+	instructor_id: string | null;
+	instructor_name: string | null;
+	capacity: number;
+	students: ScheduleProposalStudent[];
+};
+
+export type ScheduleProposalResult = {
+	proposals: ScheduleProposal[];
+	error?: string;
+	generated_at?: string;
+};
+
+export async function generateScheduleProposals(
+	courseId: string
+): Promise<ScheduleProposalResult> {
 	const { profile } = await requireSession();
 	requireRole(profile.role, ['admin']);
 	const supabase = await getSupabaseServerClient();
@@ -358,14 +381,8 @@ export async function generateScheduleProposals(courseId: string) {
 		]);
 
 	if (!course) {
-		throw new Error('수업 정보를 불러오지 못했습니다.');
+		return { proposals: [], error: '수업 정보를 불러오지 못했습니다.' };
 	}
-
-	await supabase
-		.from('matches')
-		.delete()
-		.eq('course_id', courseId)
-		.eq('status', 'proposed');
 
 	const pendingApplications = (applications ?? []).filter(
 		(app) => app.status === 'pending'
@@ -377,16 +394,15 @@ export async function generateScheduleProposals(courseId: string) {
 			return a.start_time.localeCompare(b.start_time);
 		}) ?? [];
 
-	const assignedStudents = new Set<string>();
 	const reference = new Date();
+	const proposals: ScheduleProposal[] = [];
 
 	for (const window of sortedWindows) {
-		const candidates = pendingApplications.filter((app) => {
-			const isInterested = (app.application_time_choices ?? []).some(
+		const candidates = pendingApplications.filter((app) =>
+			(app.application_time_choices ?? []).some(
 				(choice) => choice.window_id === window.id
-			);
-			return isInterested && !assignedStudents.has(app.student_id);
-		});
+			)
+		);
 
 		if (candidates.length === 0) continue;
 
@@ -399,44 +415,24 @@ export async function generateScheduleProposals(courseId: string) {
 			slotStart.getTime() + course.duration_minutes * 60000
 		);
 
-		const { data: match, error } = await supabase
-			.from('matches')
-			.insert({
-				course_id: courseId,
-				slot_start_at: slotStart.toISOString(),
-				slot_end_at: slotEnd.toISOString(),
-				instructor_id: window.instructor_id,
-				instructor_name: window.instructor_name,
-				status: 'proposed',
-				updated_by: profile.id,
-				note: '자동 추천 일정',
-			})
-			.select('id')
-			.single();
-
-		if (error || !match?.id) {
-			console.error(error);
-			continue;
-		}
-
 		const capacity = window.capacity ?? course.capacity;
 		const selected = candidates.slice(0, capacity);
-		selected.forEach((app) => assignedStudents.add(app.student_id));
 
-		if (selected.length > 0) {
-			const { error } = await supabase.from('match_students').insert(
-				selected.map((app) => ({
-					match_id: match.id,
-					student_id: app.student_id,
-				}))
-			);
-			if (error) {
-				console.error(error);
-			}
-		}
+		proposals.push({
+			window_id: window.id,
+			slot_start_at: slotStart.toISOString(),
+			slot_end_at: slotEnd.toISOString(),
+			instructor_id: window.instructor_id,
+			instructor_name: window.instructor_name,
+			capacity,
+			students: selected.map((app) => ({
+				student_id: app.student_id,
+				application_id: app.id,
+			})),
+		});
 	}
 
-	revalidatePath(`/admin/courses/${courseId}`);
+	return { proposals, generated_at: new Date().toISOString() };
 }
 
 export async function updateProposedMatch(
@@ -557,6 +553,99 @@ export async function confirmMatchSchedule(courseId: string, matchId: string) {
 
 	revalidatePath(`/admin/courses/${courseId}`);
 	revalidatePath('/admin/courses');
+}
+
+export type ConfirmSchedulePayload = {
+	slot_start_at: string;
+	slot_end_at: string;
+	instructor_id: string | null;
+	instructor_name: string | null;
+	student_ids: string[];
+};
+
+export type ConfirmScheduleResult = { success?: string; error?: string };
+
+export async function confirmScheduleFromProposal(
+	courseId: string,
+	payload: ConfirmSchedulePayload
+): Promise<ConfirmScheduleResult> {
+	const { profile } = await requireSession();
+	requireRole(profile.role, ['admin']);
+	const supabase = await getSupabaseServerClient();
+
+	const startAt = new Date(payload.slot_start_at);
+	const endAt = new Date(payload.slot_end_at);
+	if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+		return { error: '시간 정보를 확인해주세요.' };
+	}
+	if (startAt >= endAt) {
+		return { error: '시작 시간이 종료 시간보다 이전이어야 합니다.' };
+	}
+
+	const { data: course } = await supabase
+		.from('courses')
+		.select('capacity')
+		.eq('id', courseId)
+		.single();
+
+	if (!course) {
+		return { error: '수업 정보를 불러올 수 없습니다.' };
+	}
+
+	if (payload.student_ids.length === 0) {
+		return { error: '배치할 학생을 선택해주세요.' };
+	}
+
+	if (payload.student_ids.length > course.capacity) {
+		return { error: '정원보다 많은 학생을 배치할 수 없습니다.' };
+	}
+
+	const { data: match, error: matchError } = await supabase
+		.from('matches')
+		.insert({
+			course_id: courseId,
+			slot_start_at: startAt.toISOString(),
+			slot_end_at: endAt.toISOString(),
+			instructor_id: payload.instructor_id,
+			instructor_name: payload.instructor_name,
+			status: 'confirmed',
+			updated_by: profile.id,
+			updated_at: new Date().toISOString(),
+		})
+		.select('id')
+		.single();
+
+	if (matchError || !match?.id) {
+		console.error('confirm schedule insert error', matchError);
+		return { error: '일정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.' };
+	}
+
+	const { error: studentsError } = await supabase
+		.from('match_students')
+		.insert(
+			payload.student_ids.map((studentId) => ({
+				match_id: match.id,
+				student_id: studentId,
+			}))
+		);
+
+	if (studentsError) {
+		console.error('match_students insert error', studentsError);
+		await supabase.from('matches').delete().eq('id', match.id);
+		return {
+			error: '학생 배치에 실패했습니다. 다시 시도해주세요.',
+		};
+	}
+
+	await supabase
+		.from('applications')
+		.update({ status: 'matched' })
+		.eq('course_id', courseId)
+		.in('student_id', payload.student_ids);
+
+	revalidatePath(`/admin/courses/${courseId}`);
+	revalidatePath('/admin/courses');
+	return { success: '일정을 확정했습니다.' };
 }
 
 export async function sendEmailBatch(formData: FormData) {
