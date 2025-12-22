@@ -24,15 +24,26 @@ export default function LoginPage() {
 			setError(signInError.message);
 			return;
 		}
+		const userMetaData = data.user.user_metadata;
 
-		const role = data.user.user_metadata.role;
+		const { data:consent_data } = await supabase
+			.from('user_consents')
+			.select('age_confirmed, guardian_status')
+			.eq('user_id', userMetaData.id)
+
+		if (consent_data && !consent_data.age_confirmed && consent_data.guardian_status !== 'confirmed') {
+			setError('보호자 동의 완료가 필요합니다.');
+      return;
+		}
+
+		const role = userMetaData.role;
 
 		const target =
 			role === 'admin'
 				? '/admin/courses'
 				: role === 'student'
-				? '/student/applications'
-				: '/instructor/timetable';
+					? '/student/applications'
+					: '/instructor/timetable';
 
 		// ✅ 핵심: push 후 refresh (또는 refresh 후 push도 가능)
 		startTransition(() => {

@@ -11,31 +11,10 @@ import { getSupabaseServiceRoleClient } from '@/lib/supabase/admin';
 
 type SlotSelection = { windowId: string; start_time: string; end_time: string };
 
-async function assertGuardianConfirmed(
-	supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
-	userId: string
-) {
-	const { data, error } = await supabase
-		.from('user_consents')
-		.select('age_confirmed, guardian_status')
-		.eq('user_id', userId)
-		.single();
-
-	if (error || !data) {
-		console.error('guardian consent load failed', error);
-		throw new Error('동의 정보를 확인할 수 없습니다. 다시 로그인 후 시도해주세요.');
-	}
-
-	if (!data.age_confirmed && data.guardian_status !== 'confirmed') {
-		throw new Error('보호자 동의가 완료된 계정만 신청하거나 취소할 수 있습니다.');
-	}
-}
-
 export async function applyToCourse(courseId: string, windowIds: string[]) {
 	const { session, profile } = await requireSession();
 	requireRole(profile.role, ['student']);
 	const supabase = await getSupabaseServerClient();
-	await assertGuardianConfirmed(supabase, profile.id);
 	const rawSelections = Array.from(new Set(windowIds)).filter(Boolean);
 	if (rawSelections.length === 0) {
 		throw new Error('최소 1개 이상의 시간을 선택해주세요.');
@@ -52,7 +31,7 @@ export async function applyToCourse(courseId: string, windowIds: string[]) {
 	const [{ data: course }, { data: windows }] = await Promise.all([
 		supabase
 			.from('courses')
-			.select('capacity, duration_minutes')
+			.select('capacity, duration_minutes, title')
 			.eq('id', courseId)
 			.single(),
 		supabase
@@ -167,20 +146,20 @@ export async function applyToCourse(courseId: string, windowIds: string[]) {
 		}
 	}
 
-	try {
-		const from = new Date();
-		const to = new Date();
-		to.setDate(from.getDate() + 14);
+	// try {
+	// 	const from = new Date();
+	// 	const to = new Date();
+	// 	to.setDate(from.getDate() + 14);
 
-		await runMatching({
-			courseId,
-			from: from.toISOString(),
-			to: to.toISOString(),
-			requestedBy: session!.user.id,
-		});
-	} catch (error) {
-		console.error('자동 매칭 실행 실패', error);
-	}
+	// 	await runMatching({
+	// 		courseId,
+	// 		from: from.toISOString(),
+	// 		to: to.toISOString(),
+	// 		requestedBy: session!.user.id,
+	// 	});
+	// } catch (error) {
+	// 	console.error('자동 매칭 실행 실패', error);
+	// }
 
 	try {
 		const adminClient = getSupabaseServiceRoleClient();
@@ -208,7 +187,6 @@ export async function cancelApplication(applicationId: string) {
 	const { profile } = await requireSession();
 	requireRole(profile.role, ['student']);
 	const supabase = await getSupabaseServerClient();
-	await assertGuardianConfirmed(supabase, profile.id);
 
 	const { data: application } = await supabase
 		.from('applications')
