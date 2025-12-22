@@ -1,41 +1,66 @@
-import { NextResponse } from "next/server";
-import { getSupabaseServiceRoleClient } from "@/lib/supabase/admin";
+import { NextResponse } from 'next/server';
+import { getSupabaseServiceRoleClient } from '@/lib/supabase/admin';
 
 export async function GET(request: Request) {
-  const supabase = getSupabaseServiceRoleClient();
+	const supabase = getSupabaseServiceRoleClient();
 
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("user_id");
-  const token = searchParams.get("token");
+	const { searchParams } = new URL(request.url);
+	const userId = searchParams.get('user_id');
+	const token = searchParams.get('token');
 
-  if (!userId || !token) {
-    return NextResponse.redirect("/guardian-consent/error?reason=missing");
-  }
+	if (!userId || !token) {
+		const url = new URL(
+			'/guardian-consent/error?reason=missing',
+			request.url
+		);
+		return NextResponse.redirect(url);
+	}
 
-  const { data: consent, error: selectError } = await supabase
-    .from("user_consents")
-    .select("guardian_status")
-    .eq("user_id", userId)
-    .eq("guardian_token", token)
-    .single();
+	const { data: consent, error: selectError } = await supabase
+		.from('user_consents')
+		.select('guardian_status')
+		.eq('user_id', userId)
+		.eq('guardian_token', token)
+		.single();
 
-  if (selectError || !consent) {
-    return NextResponse.redirect("/guardian-consent/error?reason=invalid");
-  }
+	if (selectError || !consent) {
+		if (selectError) {
+			console.error({ selectError });
+		}
+		if (!consent) {
+			console.error('no consent!');
+		}
 
-  if (consent.guardian_status === "confirmed") {
-    return NextResponse.redirect("/guardian-consent/already-confirmed");
-  }
+		const url = new URL(
+			'/guardian-consent/error?reason=invalid',
+			request.url
+		);
+		return NextResponse.redirect(url);
+	}
 
-  const { error: updateError } = await supabase
-    .from("user_consents")
-    .update({ guardian_status: "confirmed", guardian_confirmed_at: new Date().toISOString() })
-    .eq("user_id", userId)
-    .eq("guardian_token", token);
+	if (consent.guardian_status === 'confirmed') {
+		const url = new URL('/guardian-consent/already-confirmed', request.url);
+		return NextResponse.redirect(url);
+	}
 
-  if (updateError) {
-    return NextResponse.redirect("/guardian-consent/error?reason=update_failed");
-  }
+	const { error: updateError } = await supabase
+		.from('user_consents')
+		.update({
+			guardian_status: 'confirmed',
+			guardian_confirmed_at: new Date().toISOString(),
+		})
+		.eq('user_id', userId)
+		.eq('guardian_token', token);
 
-  return NextResponse.redirect("/guardian-consent/success");
+	if (updateError) {
+		console.error({ updateError });
+
+		const url = new URL(
+			'/guardian-consent/error?reason=update_failed',
+			request.url
+		);
+		return NextResponse.redirect(url);
+	}
+	const url = new URL('/guardian-consent/success', request.url);
+	return NextResponse.redirect(url);
 }

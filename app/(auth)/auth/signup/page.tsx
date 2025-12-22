@@ -289,7 +289,7 @@ export default function SignupPage() {
 	};
 
 	return (
-		<div className='flex min-h-[70vh] items-center justify-center bg-slate-50 py-12'>
+		<div className='flex min-h-[70vh] items-center justify-center bg-slate-50 py-12 flex-1'>
 			<Card className='w-full max-w-md'>
 				<CardHeader>
 					<CardTitle>회원가입</CardTitle>

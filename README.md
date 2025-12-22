@@ -1,4 +1,4 @@
-# 린스쿨 (Lean School) – 학생·강사 온라인 수업 매칭 MVP
+# 린스쿨 (RIN School) – 학생·강사 온라인 수업 매칭 MVP
 
 Next.js(App Router, TypeScript) + Supabase(Auth/Postgres/RLS)로 구현한 린스쿨 MVP입니다. 관리자/학생/강사 역할별로 수업 등록, 신청, 자동 매칭, 시간표 확인을 제공합니다.
 
