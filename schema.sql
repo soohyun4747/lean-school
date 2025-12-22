@@ -13,6 +13,16 @@ create table if not exists profiles (
   created_at timestamptz not null default now()
 );
 
+create table if not exists user_consents (
+  user_id uuid primary key references profiles(id) on delete cascade,
+  terms_accepted_at timestamptz not null default now(),
+  privacy_accepted_at timestamptz not null default now(),
+  age_confirmed boolean not null default false,
+  guardian_email text,
+  guardian_status text not null default 'not_required' check (guardian_status in ('not_required','pending','confirmed')),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists courses (
   id uuid primary key default uuid_generate_v4(),
   title text not null,

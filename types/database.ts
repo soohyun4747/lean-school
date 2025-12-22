@@ -43,6 +43,27 @@ export interface Database {
           created_at?: string;
         };
       };
+      user_consents: {
+        Row: {
+          user_id: string;
+          terms_accepted_at: string;
+          privacy_accepted_at: string;
+          age_confirmed: boolean;
+          guardian_email: string | null;
+          guardian_status: "not_required" | "pending" | "confirmed";
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          terms_accepted_at?: string;
+          privacy_accepted_at?: string;
+          age_confirmed?: boolean;
+          guardian_email?: string | null;
+          guardian_status?: "not_required" | "pending" | "confirmed";
+          created_at?: string;
+        };
+        Update: Partial<Omit<Database["public"]["Tables"]["user_consents"]["Row"], "user_id">>;
+      };
       courses: {
         Row: {
           id: string;

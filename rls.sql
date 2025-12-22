@@ -25,6 +25,7 @@ alter table public.matches enable row level security;
 alter table public.match_students enable row level security;
 alter table public.email_batches enable row level security;
 alter table public.matching_runs enable row level security;
+alter table public.user_consents enable row level security;
 
 -- Profiles
 create policy "profiles_self_access" on public.profiles
@@ -85,3 +86,7 @@ create policy "email_batches_admin" on public.email_batches
 -- Matching runs
 create policy "matching_runs_admin" on public.matching_runs
   using (public.is_admin()) with check (public.is_admin());
+
+-- User consents
+create policy "user_consents_owner" on public.user_consents
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
