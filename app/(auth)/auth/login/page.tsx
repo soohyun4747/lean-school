@@ -1,7 +1,7 @@
 'use client';
 
 import { startTransition, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,11 @@ export default function LoginPage() {
 	const [resendMessage, setResendMessage] = useState<string | null>(null);
 	const [isResending, setIsResending] = useState(false);
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const confirmationMessage =
+		searchParams.get('type') === 'signup'
+			? '이메일 인증이 완료되었습니다. 로그인해주세요.'
+			: null;
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -125,6 +130,11 @@ export default function LoginPage() {
 								autoComplete='new-password'
 							/>
 						</div>
+						{confirmationMessage && (
+							<div className='rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800'>
+								{confirmationMessage}
+							</div>
+						)}
 						{error && (
 							<p className='text-sm text-red-600'>{error}</p>
 						)}

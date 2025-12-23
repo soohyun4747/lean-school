@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { sendEmail } from '@/lib/email';
+import { ContactForm, type ContactFormState } from './contact-form';
 
 const contactPoints = [
 	{
@@ -21,18 +22,38 @@ const contactPoints = [
 
 const contactEmail = contactPoints.find((item) => item.title === '이메일')?.value;
 
-async function submitContact(formData: FormData) {
+async function submitContact(
+	_prevState: ContactFormState,
+	formData: FormData
+): Promise<ContactFormState> {
 	'use server';
 
 	const name = (formData.get('name')?.toString() ?? '').trim();
 	const email = (formData.get('email')?.toString() ?? '').trim();
 	const message = (formData.get('message')?.toString() ?? '').trim();
 
-	await sendEmail({
-		to: contactEmail ?? 'hello@leanschool.kr',
-		subject: `[문의] ${name || '알 수 없음'}님이 남긴 문의`,
-		text: `보낸 사람: ${name || '미기재'}\n이메일: ${email || '미기재'}\n\n${message || '(내용 없음)'}`,
-	});
+	if (!name || !email || !message) {
+		return {
+			success: false,
+			error: '모든 필수 항목을 입력해 주세요.',
+		};
+	}
+
+	try {
+		await sendEmail({
+			to: contactEmail ?? 'hello@leanschool.kr',
+			subject: `[문의] ${name || '알 수 없음'}님이 남긴 문의`,
+			text: `보낸 사람: ${name || '미기재'}\n이메일: ${email || '미기재'}\n\n${message || '(내용 없음)'}`,
+		});
+
+		return { success: true };
+	} catch (error) {
+		console.error('문의 전송 실패', error);
+		return {
+			success: false,
+			error: '문의 전송에 실패했습니다. 잠시 후 다시 시도해주세요.',
+		};
+	}
 }
 
 export default function ContactPage() {
@@ -60,48 +81,7 @@ export default function ContactPage() {
 						아래 정보를 작성해 주세요. 담당자가 확인 후
 						연락드립니다.
 					</p>
-					<form action={submitContact} className='mt-6 grid gap-4'>
-						<div className='space-y-2'>
-							<label className='text-sm font-medium text-slate-700'>
-								성함
-							</label>
-							<input
-								name='name'
-								className='w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)]'
-								placeholder='이름을 입력하세요'
-								required
-							/>
-						</div>
-						<div className='space-y-2'>
-							<label className='text-sm font-medium text-slate-700'>
-								이메일
-							</label>
-							<input
-								name='email'
-								type='email'
-								className='w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)]'
-								placeholder='contact@example.com'
-								required
-							/>
-						</div>
-						<div className='space-y-2'>
-							<label className='text-sm font-medium text-slate-700'>
-								문의 내용
-							</label>
-							<textarea
-								name='message'
-								rows={4}
-								className='w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-soft)]'
-								placeholder='필요한 수업, 도입 일정 등을 알려주세요.'
-								required
-							/>
-						</div>
-						<button
-							type='submit'
-							className='inline-flex items-center justify-center rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--primary-strong)]'>
-							문의하기
-						</button>
-					</form>
+					<ContactForm action={submitContact} />
 				</div>
 
 				<div className='space-y-4'>
