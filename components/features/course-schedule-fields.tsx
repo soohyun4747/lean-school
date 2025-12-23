@@ -4,33 +4,35 @@ import { useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-
-type TimeWindowField = {
-  id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  instructor_id?: string;
-  instructor_name?: string;
-};
+import type { EditableTimeWindow, InstructorOption } from "./course-form-types";
 
 const days = ["일", "월", "화", "수", "목", "금", "토"];
 const weekOptions = [1, 2, 3, 4, 6, 8, 12];
-type InstructorOption = { id: string; name: string | null; email: string | null };
 
 interface Props {
   instructors: InstructorOption[];
+  initialWeeks?: number;
+  initialWindows?: EditableTimeWindow[];
 }
 
-export function CourseScheduleFields({ instructors }: Props) {
+type TimeWindowField = EditableTimeWindow & { id: string };
+
+export function CourseScheduleFields({ instructors, initialWeeks, initialWindows }: Props) {
   const idPrefix = useId();
   const [windows, setWindows] = useState<TimeWindowField[]>(() => [
-    {
-      id: `${idPrefix}-0`,
-      day_of_week: 1,
-      start_time: "",
-      end_time: "",
-    },
+    ...(initialWindows?.length
+      ? initialWindows.map((window, index) => ({
+          id: `${idPrefix}-${index}`,
+          ...window,
+        }))
+      : [
+          {
+            id: `${idPrefix}-0`,
+            day_of_week: 1,
+            start_time: "",
+            end_time: "",
+          },
+        ]),
   ]);
 
   const windowsPayload = useMemo(
@@ -81,7 +83,7 @@ export function CourseScheduleFields({ instructors }: Props) {
       <div className="grid gap-3 md:grid-cols-3">
         <div>
           <label className="text-sm font-medium text-slate-700">과정 기간</label>
-          <Select name="weeks" defaultValue={weekOptions[0].toString()}>
+          <Select name="weeks" defaultValue={(initialWeeks ?? weekOptions[0]).toString()}>
             {weekOptions.map((week) => (
               <option key={week} value={week}>
                 {week}주 과정

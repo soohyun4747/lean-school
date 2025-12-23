@@ -130,6 +130,7 @@ async function notifyScheduleConfirmation(
 }
 
 export type CourseCreationResult = { success: boolean; error?: string };
+export type CourseUpdateResult = { success: boolean; error?: string };
 
 export async function createCourse(
 	_prevState: CourseCreationResult,
@@ -295,6 +296,155 @@ export async function createCourse(
 	}
 
 	revalidatePath('/admin/courses');
+	revalidatePath('/classes');
+	return { success: true };
+}
+
+export async function updateCourse(
+	courseId: string,
+	_prevState: CourseUpdateResult,
+	formData: FormData
+): Promise<CourseUpdateResult> {
+	const { session, profile } = await requireSession();
+	requireRole(profile.role, ['admin']);
+	const supabase = await getSupabaseServerClient();
+
+	const title = String(formData.get('title') ?? '').trim();
+	const courseSubject = String(formData.get('subject') ?? '').trim();
+	const gradeRange = String(formData.get('grade_range') ?? '').trim();
+	const description = String(formData.get('description') ?? '').trim();
+	const capacity = Number(formData.get('capacity') ?? 4);
+	const duration = Number(formData.get('duration_minutes') ?? 60);
+	const weeks = Number(formData.get('weeks') ?? 1);
+	const parsedWindows = parseTimeWindows(
+		String(formData.get('time_windows') ?? '')
+	);
+	const currentImageUrl = String(formData.get('current_image_url') ?? '').trim();
+	const imageFile = formData.get('image');
+	let imageUrl: string | null = currentImageUrl || null;
+
+	if (!title || !courseSubject || !gradeRange) {
+		return { success: false, error: '필수 항목을 모두 입력해주세요.' };
+	}
+
+	if (!ALLOWED_WEEKS.includes(weeks)) {
+		return { success: false, error: '과정 기간을 올바르게 선택해주세요.' };
+	}
+
+	if (description && description.length > 800) {
+		return { success: false, error: '설명은 800자 이내로 작성해주세요.' };
+	}
+
+	if (parsedWindows.length === 0) {
+		return { success: false, error: '시간 범위를 1개 이상 추가해주세요.' };
+	}
+	validateTimeWindows(parsedWindows);
+
+	let slotWindows: (TimeWindowInput & {
+		start_time: string;
+		end_time: string;
+	})[] = [];
+	try {
+		slotWindows = parsedWindows.flatMap((window) =>
+			splitWindowByDuration(window, duration)
+		);
+	} catch (error) {
+		return { success: false, error: (error as Error).message };
+	}
+
+	if (imageFile instanceof File && imageFile.size > 0) {
+		if (imageFile.type && !imageFile.type.startsWith('image/')) {
+			return {
+				success: false,
+				error: '이미지 파일만 업로드할 수 있습니다.',
+			};
+		}
+
+		const extension = imageFile.name.split('.').pop() || 'png';
+		const fileName = `${
+			crypto.randomUUID?.() ?? Date.now().toString()
+		}.${extension}`;
+		const filePath = `courses/${session.user.id}/${fileName}`;
+
+		const { error: uploadError } = await supabase.storage
+			.from('course-images')
+			.upload(filePath, imageFile, {
+				cacheControl: '3600',
+				upsert: false,
+				contentType: imageFile.type || undefined,
+			});
+
+		if (uploadError) {
+			console.error('course image upload error:', uploadError);
+			return {
+				success: false,
+				error: '이미지 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.',
+			};
+		}
+
+		const { data } = supabase.storage
+			.from('course-images')
+			.getPublicUrl(filePath);
+		imageUrl = data.publicUrl;
+	}
+
+	const { error: courseUpdateError } = await supabase
+		.from('courses')
+		.update({
+			title,
+			subject: courseSubject,
+			grade_range: gradeRange,
+			description: description || null,
+			weeks,
+			capacity,
+			duration_minutes: duration,
+			image_url: imageUrl,
+		})
+		.eq('id', courseId);
+
+	if (courseUpdateError) {
+		console.error('courses update error:', courseUpdateError);
+		return { success: false, error: `Update failed: ${courseUpdateError.message}` };
+	}
+
+	const timeWindows = slotWindows.map((w) => ({
+		course_id: courseId,
+		day_of_week: w.day_of_week,
+		start_time: w.start_time,
+		end_time: w.end_time,
+		instructor_id: w.instructor_id || null,
+		instructor_name: w.instructor_name || null,
+		capacity,
+	}));
+
+	const { error: deleteError } = await supabase
+		.from('course_time_windows')
+		.delete()
+		.eq('course_id', courseId);
+	if (deleteError) {
+		console.error('course time window delete error:', deleteError);
+		return {
+			success: false,
+			error: '기존 시간 범위를 삭제하지 못했습니다. 다시 시도해주세요.',
+		};
+	}
+
+	const { error: insertError } = await supabase
+		.from('course_time_windows')
+		.insert(timeWindows);
+
+	if (insertError) {
+		console.error('course time window insert error:', insertError);
+		return {
+			success: false,
+			error: '시간 정보를 저장하지 못했습니다. 다시 시도해주세요.',
+		};
+	}
+
+	revalidatePath('/admin/courses');
+	revalidatePath(`/admin/courses/${courseId}`);
+	revalidatePath(`/admin/courses/${courseId}/time-windows`);
+	revalidatePath(`/admin/courses/${courseId}/edit`);
 	revalidatePath('/classes');
 	return { success: true };
 }
