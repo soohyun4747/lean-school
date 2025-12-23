@@ -5,8 +5,8 @@ import { sendEmail } from '@/lib/email';
 const contactPoints = [
 	{
 		title: '이메일',
-		value: 'hello@leanschool.kr',
-		href: 'mailto:hello@leanschool.kr',
+		value: 'soohyun4747@gmail.com',
+		href: 'mailto:soohyun4747@gmail.com',
 	},
 	{
 		title: '전화',
@@ -99,7 +99,7 @@ export default function ContactPage() {
 						<button
 							type='submit'
 							className='inline-flex items-center justify-center rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--primary-strong)]'>
-							문의 남기기
+							문의하기
 						</button>
 					</form>
 				</div>
