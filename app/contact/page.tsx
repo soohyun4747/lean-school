@@ -6,13 +6,13 @@ import { ContactForm, type ContactFormState } from './contact-form';
 const contactPoints = [
 	{
 		title: '이메일',
-		value: 'soohyun4747@gmail.com',
-		href: 'mailto:soohyun4747@gmail.com',
+		value: 'rinetwork3@gmail.com',
+		href: 'mailto:rinetwork3@gmail.com',
 	},
 	{
 		title: '전화',
-		value: '02-123-4567',
-		href: 'tel:+8221234567',
+		value: '010-7122-5112',
+		href: 'tel:+821071225112',
 	},
 	{
 		title: '운영 시간',
