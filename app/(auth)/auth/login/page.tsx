@@ -37,12 +37,14 @@ export default function LoginPage() {
 			}
 			return;
 		}
+		const userData = data.user;
 		const userMetaData = data.user.user_metadata;
 
 		const { data: consentData } = await supabase
 			.from('user_consents')
 			.select('age_confirmed, guardian_status')
-			.eq('user_id', userMetaData.id);
+			.eq('user_id', userData.id)
+			.single();
 
 		if (
 			consentData &&
