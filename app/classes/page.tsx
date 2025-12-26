@@ -16,11 +16,12 @@ const fallbackCourseImage =
 
 export default async function ClassesPage() {
 	const supabase = await getSupabaseServerClient();
-	const { data: courses, error } = await supabase
-		.from('courses')
-		.select('id, title, subject, grade_range, description, image_url')
-		.order('created_at', { ascending: false })
-		.limit(12);
+        const { data: courses, error } = await supabase
+                .from('courses')
+                .select('id, title, subject, grade_range, description, image_url')
+                .order('sort_order', { ascending: true })
+                .order('created_at', { ascending: false })
+                .limit(12);
 
 	const courseList = courses ?? [];
 

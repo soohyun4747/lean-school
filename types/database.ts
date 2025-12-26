@@ -78,6 +78,7 @@ export interface Database {
           weeks: number;
           duration_minutes: number;
           capacity: number;
+          sort_order: number;
           image_url: string | null;
           created_by: string;
           created_at: string;
@@ -91,6 +92,7 @@ export interface Database {
           weeks?: number;
           duration_minutes?: number;
           capacity?: number;
+          sort_order?: number;
           image_url?: string | null;
           created_by: string;
           created_at?: string;

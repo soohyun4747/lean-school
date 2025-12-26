@@ -131,6 +131,7 @@ async function notifyScheduleConfirmation(
 
 export type CourseCreationResult = { success: boolean; error?: string };
 export type CourseUpdateResult = { success: boolean; error?: string };
+export type CourseOrderUpdateResult = { success: boolean; error?: string };
 
 export async function createCourse(
 	_prevState: CourseCreationResult,
@@ -297,7 +298,39 @@ export async function createCourse(
 
 	revalidatePath('/admin/courses');
 	revalidatePath('/classes');
-	return { success: true };
+        return { success: true };
+}
+
+export async function updateCourseOrder(
+        courseId: string,
+        _prevState: CourseOrderUpdateResult,
+        formData: FormData
+): Promise<CourseOrderUpdateResult> {
+        const { profile } = await requireSession();
+        requireRole(profile.role, ['admin']);
+        const supabase = await getSupabaseServerClient();
+
+        const sortOrder = Number(formData.get('sort_order'));
+        if (Number.isNaN(sortOrder)) {
+                return { success: false, error: '올바른 순서를 입력해주세요.' };
+        }
+
+        const { error } = await supabase
+                .from('courses')
+                .update({ sort_order: sortOrder })
+                .eq('id', courseId);
+
+        if (error) {
+                console.error('course order update error:', error);
+                return {
+                        success: false,
+                        error: '수업 순서를 저장하는 중 문제가 발생했습니다.',
+                };
+        }
+
+        revalidatePath('/admin/courses');
+        revalidatePath('/classes');
+        return { success: true };
 }
 
 export async function updateCourse(

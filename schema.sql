@@ -42,6 +42,7 @@ create table if not exists courses (
   weeks int not null default 1,
   duration_minutes int not null default 60,
   capacity int not null default 4,
+  sort_order int not null default 0,
   image_url text,
   created_by uuid references profiles(id),
   created_at timestamptz not null default now()
