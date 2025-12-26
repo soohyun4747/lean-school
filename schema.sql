@@ -39,6 +39,7 @@ create table if not exists courses (
   subject text not null,
   grade_range text not null,
   description text,
+  display_order int not null default 0,
   weeks int not null default 1,
   duration_minutes int not null default 60,
   capacity int not null default 4,

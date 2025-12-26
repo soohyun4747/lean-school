@@ -204,32 +204,42 @@ export async function createCourse(
 				contentType: imageFile.type || undefined,
 			});
 
-		if (uploadError) {
-			console.error('course image upload error:', uploadError);
-			return {
-				success: false,
-				error: '이미지 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.',
-			};
-		}
+        if (uploadError) {
+                console.error('course image upload error:', uploadError);
+                return {
+                        success: false,
+                        error: '이미지 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.',
+                };
+        }
 
-		const { data } = supabase.storage
-			.from('course-images')
-			.getPublicUrl(filePath);
-		imageUrl = data.publicUrl;
-	}
+        const { data } = supabase.storage
+                .from('course-images')
+                .getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
+}
 
-	const { data: newCourse, error } = await supabase
-		.from('courses')
-		.insert({
-			title,
-			subject: courseSubject,
-			grade_range: gradeRange,
-			description: description || null,
-			weeks,
-			capacity,
-			duration_minutes: duration,
-			image_url: imageUrl,
-			created_by: session.user.id, // (권장: 아래 참고)
+        const { data: lastCourse } = await supabase
+                .from('courses')
+                .select('display_order')
+                .order('display_order', { ascending: false, nullsLast: true })
+                .limit(1)
+                .maybeSingle();
+
+        const nextDisplayOrder = (lastCourse?.display_order ?? 0) + 1;
+
+        const { data: newCourse, error } = await supabase
+                .from('courses')
+                .insert({
+                        title,
+                        subject: courseSubject,
+                        grade_range: gradeRange,
+                        description: description || null,
+                        display_order: nextDisplayOrder,
+                        weeks,
+                        capacity,
+                        duration_minutes: duration,
+                        image_url: imageUrl,
+                        created_by: session.user.id, // (권장: 아래 참고)
 		})
 		.select('id')
 		.single();
@@ -450,9 +460,9 @@ export async function updateCourse(
 }
 
 export async function deleteCourse(courseId: string) {
-	const { profile } = await requireSession();
-	requireRole(profile.role, ['admin']);
-	const supabase = await getSupabaseServerClient();
+        const { profile } = await requireSession();
+        requireRole(profile.role, ['admin']);
+        const supabase = await getSupabaseServerClient();
 
 	const { error } = await supabase
 		.from('courses')
@@ -461,14 +471,39 @@ export async function deleteCourse(courseId: string) {
 
 	if (error) {
 		console.error(error);
-	}
-	revalidatePath('/admin/courses');
-	revalidatePath('/classes');
+        }
+        revalidatePath('/admin/courses');
+        revalidatePath('/classes');
+}
+
+export async function reorderCourses(courseIds: string[]) {
+        const { profile } = await requireSession();
+        requireRole(profile.role, ['admin']);
+        const supabase = await getSupabaseServerClient();
+
+        const updates = courseIds.map((id, index) => ({
+                id,
+                display_order: index + 1,
+        }));
+
+        const { error } = await supabase.from('courses').upsert(updates);
+
+        if (error) {
+                console.error('course reorder error:', error);
+                return {
+                        success: false,
+                        error: '수업 순서를 저장하는 중 문제가 발생했습니다. 다시 시도해주세요.',
+                };
+        }
+
+        revalidatePath('/admin/courses');
+        revalidatePath('/classes');
+        return { success: true };
 }
 
 export async function createTimeWindow(courseId: string, formData: FormData) {
-	const { profile } = await requireSession();
-	requireRole(profile.role, ['admin']);
+        const { profile } = await requireSession();
+        requireRole(profile.role, ['admin']);
 	const supabase = await getSupabaseServerClient();
 
 	const { data: course } = await supabase

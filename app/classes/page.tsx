@@ -15,12 +15,13 @@ const fallbackCourseImage =
 	'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1200&q=80';
 
 export default async function ClassesPage() {
-	const supabase = await getSupabaseServerClient();
-	const { data: courses, error } = await supabase
-		.from('courses')
-		.select('id, title, subject, grade_range, description, image_url')
-		.order('created_at', { ascending: false })
-		.limit(12);
+        const supabase = await getSupabaseServerClient();
+        const { data: courses, error } = await supabase
+                .from('courses')
+                .select('id, title, subject, grade_range, description, image_url')
+                .order('display_order', { ascending: true, nullsLast: true })
+                .order('created_at', { ascending: false })
+                .limit(12);
 
 	const courseList = courses ?? [];
 
