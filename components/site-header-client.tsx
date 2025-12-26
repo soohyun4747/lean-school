@@ -100,7 +100,7 @@ export function SiteHeaderClient({
 				{!isLoggedIn && (
 					<Link
 						href='/auth/login'
-						className='rounded-md px-2 py-2 hover:bg-[var(--primary-soft)]'
+						className='rounded-md px-2 py-2 hover:bg-[var(--primary-soft)] md:hidden'
 						onClick={closeMobileMenu}>
 						로그인
 					</Link>

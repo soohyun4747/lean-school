@@ -251,7 +251,7 @@ export default function SignupPage() {
 				});
 			}
 			setMessage(
-				'회원가입 신청이 완료되었습니다. 이메일로 발송된 인증 링크를 확인해 주세요.'
+				'회원가입 신청이 완료되었습니다.'
 			);
 			router.push('/auth/login');
 		} catch (err) {
