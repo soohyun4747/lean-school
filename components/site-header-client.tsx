@@ -75,7 +75,7 @@ export function SiteHeaderClient({
 						))}
 					</nav>
 				</div>
-				<div className='hidden flex-1 items-center justify-end gap-3 text-sm text-slate-700 md:flex'>
+				<div className='hidden items-center justify-end gap-3 text-sm text-slate-700 md:flex'>
 					{isLoggedIn ? (
 						<form action={logout}>
 							<button
