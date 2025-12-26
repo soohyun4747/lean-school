@@ -148,7 +148,7 @@ export default async function StudentCourseDetail({
 						</div>
 					</div>
 					{course.description && (
-						<p className='text-sm text-slate-700'>
+						<p className='text-sm text-slate-700 whitespace-pre-line'>
 							{course.description}
 						</p>
 					)}
