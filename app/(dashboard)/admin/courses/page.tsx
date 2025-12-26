@@ -5,18 +5,20 @@ import { ConfirmSubmitButton } from '@/components/ui/confirm-submit-button';
 import { requireSession, requireRole } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { CourseCreateModal } from '@/components/features/course-create-modal';
+import { CourseOrderControl } from '@/components/features/course-order-control';
 
 export interface ICourse {
 	id: string;
 	title: string;
 	subject: string;
-	grade_range: string;
-	description: string | null;
-	capacity: number;
-	duration_minutes: number;
-	weeks: number;
-	created_at: number;
-	image_url: string;
+        grade_range: string;
+        description: string | null;
+        capacity: number;
+        duration_minutes: number;
+        weeks: number;
+        created_at: string;
+        sort_order: number;
+        image_url: string;
 }
 
 export default async function AdminCoursesPage() {
@@ -26,10 +28,11 @@ export default async function AdminCoursesPage() {
 	const [{ data: courses, error }, { data: instructors }] = await Promise.all([
 		supabase
 			.from('courses')
-			.select(
-				'id, title, subject, grade_range, description, capacity, duration_minutes, created_at, image_url, weeks'
-			)
-			.order('created_at', { ascending: false }),
+                        .select(
+                                'id, title, subject, grade_range, description, capacity, duration_minutes, created_at, image_url, weeks, sort_order'
+                        )
+                        .order('sort_order', { ascending: true })
+                        .order('created_at', { ascending: false }),
 		supabase
 			.from('profiles')
 			.select('id, name, email')
@@ -90,54 +93,66 @@ export default async function AdminCoursesPage() {
 											</div>
 										)}
 									</div>
-									<div className='flex-1'>
-										<div className='flex items-start justify-between gap-2'>
-											<div>
-												<h3 className='text-base font-semibold text-slate-900 group-hover:text-[var(--primary)]'>
-													{course.title}
-												</h3>
-												<div className='mt-1 flex flex-wrap gap-2 text-xs'>
-													<span className='rounded-full bg-[var(--primary-soft)] px-2 py-1 font-semibold text-[var(--primary)]'>
-														{course.weeks}주 과정
-													</span>
-												</div>
-												<p className='text-sm text-slate-600'>
-													{course.subject} ·{' '}
-													{course.grade_range} ·{' '}
-													{course.duration_minutes}분
-												· 정원 {course.capacity}
-												</p>
-												{course.description && (
-													<p className='mt-1 max-h-12 overflow-hidden text-xs text-slate-700'>
-														{course.description}
-													</p>
-												)}
-											</div>
-										</div>
-									</div>
+                                                                        <div className='flex-1'>
+                                                                                <div className='flex items-start justify-between gap-2'>
+                                                                                        <div>
+                                                                                                <h3 className='text-base font-semibold text-slate-900 group-hover:text-[var(--primary)]'>
+                                                                                                        {course.title}
+                                                                                                </h3>
+                                                                                                <div className='mt-1 flex flex-wrap gap-2 text-xs'>
+                                                                                                        <span className='rounded-full bg-[var(--primary-soft)] px-2 py-1 font-semibold text-[var(--primary)]'>
+                                                                                                                {course.weeks}주 과정
+                                                                                                        </span>
+                                                                                                </div>
+                                                                                                <p className='text-sm text-slate-600'>
+                                                                                                        {course.subject} ·{' '}
+                                                                                                        {course.grade_range} ·{' '}
+                                                                                                        {course.duration_minutes}분 · 정원 {course.capacity}
+                                                                                                </p>
+                                                                                                {course.description && (
+                                                                                                        <p className='mt-1 max-h-12 overflow-hidden text-xs text-slate-700'>
+                                                                                                                {course.description}
+                                                                                                        </p>
+                                                                                                )}
+                                                                                                <div className='mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700'>
+                                                                                                        노출 순서 {course.sort_order}
+                                                                                                </div>
+                                                                                        </div>
+                                                                                        <div className='hidden text-xs font-medium uppercase tracking-wide text-[var(--primary)] sm:block'>
+                                                                                                course
+                                                                                        </div>
+                                                                                </div>
+                                                                        </div>
 								</Link>
-								<div className='flex flex-wrap items-center gap-2 text-sm'>
-									<Link
-										href={`/admin/courses/${course.id}`}
-										className='rounded-md border border-[var(--primary-border)] px-3 py-2 font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
-											상세 보기
-										</Link>
-									<Link
-										href={`/admin/courses/${course.id}/edit`}
-										className='rounded-md border border-[var(--primary-border)] px-3 py-2 text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
-											수업 수정
-										</Link>
-									<form action={deleteCourse.bind(null, course.id)} className='ml-auto'>
-										<ConfirmSubmitButton
-											variant='ghost'
-											className='text-red-600'>
-											삭제
-										</ConfirmSubmitButton>
-									</form>
-								</div>
-							</div>
-						))}
-					</div>
+                                                                <div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
+                                                                                        <CourseOrderControl
+                                                                                                key={`${course.id}-${course.sort_order}`}
+                                                                                                courseId={course.id}
+                                                                                                initialOrder={course.sort_order ?? 0}
+                                                                                        />
+                                                                        <div className='flex flex-wrap items-center gap-2 text-sm'>
+                                                                                <Link
+                                                                                        href={`/admin/courses/${course.id}`}
+                                                                                        className='rounded-md border border-[var(--primary-border)] px-3 py-2 font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
+                                                                                                상세 보기
+                                                                                </Link>
+                                                                                <Link
+                                                                                        href={`/admin/courses/${course.id}/edit`}
+                                                                                        className='rounded-md border border-[var(--primary-border)] px-3 py-2 text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
+                                                                                                수업 수정
+                                                                                </Link>
+                                                                                <form action={deleteCourse.bind(null, course.id)} className='md:ml-auto'>
+                                                                                        <ConfirmSubmitButton
+                                                                                                variant='ghost'
+                                                                                                className='text-red-600'>
+                                                                                                삭제
+                                                                                        </ConfirmSubmitButton>
+                                                                                </form>
+                                                                        </div>
+                                                                </div>
+                                                        </div>
+                                                ))}
+                                        </div>
 				</CardContent>
 			</Card>
 		</div>
