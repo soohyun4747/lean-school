@@ -2,7 +2,11 @@
 
 import Link from 'next/link';
 import { useRef, useState, useTransition } from 'react';
-import { deleteCourse, reorderCourses, updateCourseClosed } from '@/app/actions/admin';
+import {
+	deleteCourse,
+	reorderCourses,
+	updateCourseClosed,
+} from '@/app/actions/admin';
 import type { ICourse } from '@/app/(dashboard)/admin/courses/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,12 +38,12 @@ export function AdminCourseList({ courses }: CourseListProps) {
 	const initialOrderRef = useRef<string[]>(
 		courses.map((course) => course.id)
 	);
-        const [currentCourses, setCurrentCourses] = useState<ICourse[]>(courses);
-        const [draggingId, setDraggingId] = useState<string | null>(null);
-        const [hasChanges, setHasChanges] = useState(false);
-        const [status, setStatus] = useState<StatusMessage | null>(null);
-        const [closingCourseId, setClosingCourseId] = useState<string | null>(null);
-        const [isPending, startTransition] = useTransition();
+	const [currentCourses, setCurrentCourses] = useState<ICourse[]>(courses);
+	const [draggingId, setDraggingId] = useState<string | null>(null);
+	const [hasChanges, setHasChanges] = useState(false);
+	const [status, setStatus] = useState<StatusMessage | null>(null);
+	const [closingCourseId, setClosingCourseId] = useState<string | null>(null);
+	const [isPending, startTransition] = useTransition();
 
 	const courseCount = currentCourses.length;
 
@@ -83,11 +87,11 @@ export function AdminCourseList({ courses }: CourseListProps) {
 		});
 	};
 
-        const handleSave = () => {
-                startTransition(async () => {
-                        const result = await reorderCourses(
-                                currentCourses.map((course) => course.id)
-                        );
+	const handleSave = () => {
+		startTransition(async () => {
+			const result = await reorderCourses(
+				currentCourses.map((course) => course.id)
+			);
 			if (!result?.success) {
 				setStatus({
 					type: 'error',
@@ -99,44 +103,45 @@ export function AdminCourseList({ courses }: CourseListProps) {
 
 			initialOrderRef.current = currentCourses.map((course) => course.id);
 			setHasChanges(false);
-                        setStatus({
-                                type: 'success',
-                                message: '수업 순서가 저장되었습니다.',
-                        });
-                });
-        };
+			setStatus({
+				type: 'success',
+				message: '수업 순서가 저장되었습니다.',
+			});
+		});
+	};
 
-        const handleToggleClosed = (courseId: string, nextClosed: boolean) => {
-                setClosingCourseId(courseId);
-                startTransition(async () => {
-                        const result = await updateCourseClosed(courseId, nextClosed);
+	const handleToggleClosed = (courseId: string, nextClosed: boolean) => {
+		setClosingCourseId(courseId);
+		startTransition(async () => {
+			const result = await updateCourseClosed(courseId, nextClosed);
 
-                        if (!result?.success) {
-                                setStatus({
-                                        type: 'error',
-                                        message:
-                                                result?.error ?? '신청 마감 상태를 변경하지 못했습니다.',
-                                });
-                                setClosingCourseId(null);
-                                return;
-                        }
+			if (!result?.success) {
+				setStatus({
+					type: 'error',
+					message:
+						result?.error ??
+						'신청 마감 상태를 변경하지 못했습니다.',
+				});
+				setClosingCourseId(null);
+				return;
+			}
 
-                        setCurrentCourses((prev) =>
-                                prev.map((course) =>
-                                        course.id === courseId
-                                                ? { ...course, is_closed: nextClosed }
-                                                : course
-                                )
-                        );
-                        setStatus({
-                                type: 'success',
-                                message: nextClosed
-                                        ? '수업 신청을 마감했습니다.'
-                                        : '수업 신청을 다시 열었습니다.',
-                        });
-                        setClosingCourseId(null);
-                });
-        };
+			setCurrentCourses((prev) =>
+				prev.map((course) =>
+					course.id === courseId
+						? { ...course, is_closed: nextClosed }
+						: course
+				)
+			);
+			setStatus({
+				type: 'success',
+				message: nextClosed
+					? '수업 신청을 마감했습니다.'
+					: '수업 신청을 다시 열었습니다.',
+			});
+			setClosingCourseId(null);
+		});
+	};
 
 	if (currentCourses.length === 0) {
 		return (
@@ -160,14 +165,14 @@ export function AdminCourseList({ courses }: CourseListProps) {
 							{status.message}
 						</span>
 					)}
-                                        <Button
-                                                type='button'
-                                                size='sm'
-                                                onClick={handleSave}
-                                                disabled={!hasChanges || isPending}>
-                                                {isPending ? '저장 중...' : '순서 저장'}
-                                        </Button>
-                                </div>
+					<Button
+						type='button'
+						size='sm'
+						onClick={handleSave}
+						disabled={!hasChanges || isPending}>
+						{isPending ? '저장 중...' : '순서 저장'}
+					</Button>
+				</div>
 			</div>
 
 			<div className='grid gap-3 md:grid-cols-2'>
@@ -243,21 +248,23 @@ export function AdminCourseList({ courses }: CourseListProps) {
 									</div>
 								)}
 							</div>
-                                                        <div className='flex-1'>
-                                                                <div className='flex items-start justify-between gap-2'>
-                                                                        <div>
-                                                                                <h3 className='text-base font-semibold text-slate-900 group-hover:text-[var(--primary)]'>
-                                                                                        {course.title}
-                                                                                </h3>
-                                                                                {course.is_closed && (
-                                                                                        <Badge variant='warning'>
-                                                                                                신청 마감
-                                                                                        </Badge>
-                                                                                )}
-                                                                                <div className='mt-1 flex flex-wrap gap-2 text-xs'>
-                                                                                        <span className='rounded-full bg-[var(--primary-soft)] px-2 py-1 font-semibold text-[var(--primary)]'>
-                                                                                                {course.weeks}주 과정
-											</span>
+							<div className='flex-1'>
+								<div className='flex items-start justify-between gap-2'>
+									<div>
+										<h3 className='text-base font-semibold text-slate-900 group-hover:text-[var(--primary)]'>
+											{course.title}
+										</h3>
+										<div className='flex items-center gap-1 my-1'>
+											<div className='flex flex-wrap gap-2 text-xs'>
+												<span className='rounded-full bg-[var(--primary-soft)] px-2 py-1 font-semibold text-[var(--primary)]'>
+													{course.weeks}주 과정
+												</span>
+											</div>
+											{course.is_closed && (
+												<Badge variant='warning'>
+													신청 마감
+												</Badge>
+											)}
 										</div>
 										<p className='text-sm text-slate-600'>
 											{course.subject} ·{' '}
@@ -276,44 +283,44 @@ export function AdminCourseList({ courses }: CourseListProps) {
 						</Link>
 
 						<div className='flex flex-wrap items-center gap-2 text-sm'>
-                                                        <Link
-                                                                href={`/admin/courses/${course.id}`}
-                                                                className='rounded-md border border-[var(--primary-border)] px-3 py-2 font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
-                                                                상세 보기
-                                                        </Link>
+							<Link
+								href={`/admin/courses/${course.id}`}
+								className='rounded-md border border-[var(--primary-border)] px-3 py-2 font-semibold text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
+								상세 보기
+							</Link>
 							<Link
 								href={`/admin/courses/${course.id}/edit`}
 								className='rounded-md border border-[var(--primary-border)] px-3 py-2 text-[var(--primary)] hover:bg-[var(--primary-soft)]'>
 								수업 수정
 							</Link>
-                                                        <form
-                                                                action={deleteCourse.bind(null, course.id)}
-                                                                className='ml-auto'>
-                                                                <ConfirmSubmitButton
-                                                                        variant='ghost'
-                                                                        className='text-red-600'>
-                                                                        삭제
-                                                                </ConfirmSubmitButton>
-                                                        </form>
-                                                        <Button
-                                                                type='button'
-                                                                variant={course.is_closed ? 'outline' : 'secondary'}
-                                                                onClick={() =>
-                                                                        handleToggleClosed(
-                                                                                course.id,
-                                                                                !course.is_closed
-                                                                        )
-                                                                }
-                                                                disabled={
-                                                                        closingCourseId === course.id || isPending
-                                                                }>
-                                                                {course.is_closed
-                                                                        ? '마감 해제'
-                                                                        : '신청 마감'}
-                                                        </Button>
-                                                </div>
-                                        </div>
-                                ))}
+							<form
+								action={deleteCourse.bind(null, course.id)}
+								className='ml-auto'>
+								<ConfirmSubmitButton
+									variant='ghost'
+									className='text-red-600'>
+									삭제
+								</ConfirmSubmitButton>
+							</form>
+							<Button
+								type='button'
+								variant={
+									course.is_closed ? 'outline' : 'secondary'
+								}
+								onClick={() =>
+									handleToggleClosed(
+										course.id,
+										!course.is_closed
+									)
+								}
+								disabled={
+									closingCourseId === course.id || isPending
+								}>
+								{course.is_closed ? '마감 해제' : '신청 마감'}
+							</Button>
+						</div>
+					</div>
+				))}
 			</div>
 		</div>
 	);

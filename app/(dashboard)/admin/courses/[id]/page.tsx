@@ -54,13 +54,13 @@ export default async function AdminCourseDetailPage({
 	const { id } = await params;
 	const supabase = await getSupabaseServerClient();
 
-        const { data: courseData } = await supabase
-                .from('courses')
-                .select(
-                        'id, title, subject, grade_range, description, duration_minutes, capacity, image_url, weeks, is_closed'
-                )
-                .eq('id', id)
-                .single();
+	const { data: courseData } = await supabase
+		.from('courses')
+		.select(
+			'id, title, subject, grade_range, description, duration_minutes, capacity, image_url, weeks, is_closed'
+		)
+		.eq('id', id)
+		.single();
 
 	if (!courseData) notFound();
 	const course: ICourse = courseData;
@@ -115,7 +115,7 @@ export default async function AdminCourseDetailPage({
 					phone: string | null;
 					birthdate: string | null;
 				}[],
-		  };
+			};
 	const profileMap = new Map(profiles?.map((p) => [p.id, p]));
 
 	const windowsRows: WindowRow[] = windows ?? [];
@@ -139,7 +139,7 @@ export default async function AdminCourseDetailPage({
 		instructor_name: string | null;
 	}) =>
 		w.instructor_id
-			? profileMap.get(w.instructor_id)?.name ?? w.instructor_id
+			? (profileMap.get(w.instructor_id)?.name ?? w.instructor_id)
 			: w.instructor_name || '미지정';
 	const badgeVariant = (
 		status: string
@@ -161,17 +161,19 @@ export default async function AdminCourseDetailPage({
 		<div className='space-y-6'>
 			<div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
 				<div className='space-y-1'>
-                                        <p className='text-sm text-slate-500'>수업 상세</p>
-                                        <h1 className='text-2xl font-bold text-slate-900'>
-                                                {course.title}
-                                        </h1>
-                                        {course.is_closed && (
-                                                <Badge variant='warning'>신청 마감</Badge>
-                                        )}
-                                        <p className='text-sm text-slate-600'>
-                                                {course.subject} · {course.grade_range} ·{' '}
-                                                {course.duration_minutes}분 · 정원 {course.capacity}
-					</p>
+					<p className='text-sm text-slate-500'>수업 상세</p>
+					<h1 className='text-2xl font-bold text-slate-900'>
+						{course.title}
+					</h1>
+					<div className='flex items-center gap-2'>
+						<p className='text-sm text-slate-600'>
+							{course.subject} · {course.grade_range} ·{' '}
+							{course.duration_minutes}분 · 정원 {course.capacity}
+						</p>
+						{course.is_closed && (
+							<Badge variant='warning'>신청 마감</Badge>
+						)}
+					</div>
 				</div>
 				<div className='flex flex-wrap gap-2'>
 					<Link
@@ -310,15 +312,19 @@ export default async function AdminCourseDetailPage({
 										<p className='text-xs text-slate-600'>
 											강사:{' '}
 											{match.instructor_id
-												? profileMap.get(
+												? (profileMap.get(
 														match.instructor_id
-												  )?.name ?? match.instructor_id
-												: match.instructor_name ??
-												  '미지정'}
+													)?.name ??
+													match.instructor_id)
+												: (match.instructor_name ??
+													'미지정')}
 										</p>
 									</div>
 									<div className='flex items-center gap-2'>
-										<Badge variant={badgeVariant(match.status)}>
+										<Badge
+											variant={badgeVariant(
+												match.status
+											)}>
 											확정됨
 										</Badge>
 										<form
@@ -489,7 +495,7 @@ export default async function AdminCourseDetailPage({
 																		return w
 																			? windowLabel(
 																					w
-																			  )
+																				)
 																			: '삭제된 시간';
 																	}
 																)
