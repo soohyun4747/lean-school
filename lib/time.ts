@@ -28,7 +28,7 @@ export function splitWindowByDuration<
 		end_time: string;
 		instructor_id?: string | null;
 		instructor_name?: string | null;
-	}
+	},
 >(window: T, durationMinutes: number) {
 	const startMinutes = minutesFromTimeString(window.start_time);
 	const endMinutes = minutesFromTimeString(window.end_time);
@@ -139,17 +139,42 @@ function getNextDateForDay(dayOfWeek: number, reference: Date, time: string) {
 	return target;
 }
 
+// ✅ 서버 타임존(UTC)과 무관하게 "KST 기준 요일+시간"을 정확한 Date로 만들어줌
+const KST_OFFSET_MINUTES = 9 * 60;
+
 export function combineDayAndTime(
-	dayOfWeek: number,
-	time: string,
-	reference: Date
+	dayOfWeek: number, // 0=Sun ... 6=Sat (JS 기준)
+	timeStr: string, // "22:00:00" or "22:00"
+	reference: Date // 기준(현재)
 ) {
-	const [hour, minute] = time.split(':').map(Number);
-	const day = new Date(reference);
-	day.setHours(hour, minute, 0, 0);
-	const diff = (dayOfWeek + 7 - day.getDay()) % 7;
-	day.setDate(day.getDate() + diff);
-	return day;
+	const [hh, mm = '0', ss = '0'] = timeStr.split(':');
+	const h = Number(hh);
+	const m = Number(mm);
+	const s = Number(ss);
+
+	// reference를 KST로 "해석"하기 위해 +9시간 한 뒤 UTC getter로 뽑아냄
+	const refKst = new Date(reference.getTime() + KST_OFFSET_MINUTES * 60_000);
+	const refY = refKst.getUTCFullYear();
+	const refM = refKst.getUTCMonth();
+	const refD = refKst.getUTCDate();
+	const refDow = refKst.getUTCDay(); // KST에서의 요일
+
+	// reference(KST) 기준으로 target 요일까지의 차이(0~6)
+	const diffDays = (dayOfWeek - refDow + 7) % 7;
+
+	// "KST 자정"을 UTC timestamp로 환산한 기준점
+	const kstMidnightUtcMs =
+		Date.UTC(refY, refM, refD) - KST_OFFSET_MINUTES * 60_000;
+
+	// target day + time(KST)를 UTC ms로 만들기
+	const targetUtcMs =
+		kstMidnightUtcMs +
+		diffDays * 24 * 60 * 60_000 +
+		h * 60 * 60_000 +
+		m * 60_000 +
+		s * 1_000;
+
+	return new Date(targetUtcMs);
 }
 
 export function buildSlotsFromDayTimeRanges(
