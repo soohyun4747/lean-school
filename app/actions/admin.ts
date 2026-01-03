@@ -897,11 +897,13 @@ export async function addStudentToMatch(courseId: string, formData: FormData) {
 		throw new Error('학생과 매칭 정보를 확인해주세요.');
 	}
 
-	const { data: match } = await supabase
-		.from('matches')
-		.select('id, course_id, status')
-		.eq('id', matchId)
-		.single();
+        const { data: match } = await supabase
+                .from('matches')
+                .select(
+                        'id, course_id, status, slot_start_at, slot_end_at, instructor_name'
+                )
+                .eq('id', matchId)
+                .single();
 
 	if (!match || match.course_id !== courseId) {
 		throw new Error('매칭을 찾을 수 없습니다.');
@@ -911,13 +913,42 @@ export async function addStudentToMatch(courseId: string, formData: FormData) {
 		.from('match_students')
 		.insert({ match_id: matchId, student_id: studentId });
 
-	if (!error && match.status === 'confirmed') {
-		await supabase
-			.from('applications')
-			.update({ status: 'matched' })
-			.eq('course_id', courseId)
-			.eq('student_id', studentId);
-	}
+        if (!error && match.status === 'confirmed') {
+                await supabase
+                        .from('applications')
+                        .update({ status: 'matched' })
+                        .eq('course_id', courseId)
+                        .eq('student_id', studentId);
+
+                try {
+                        const [{ data: student }, { data: course }] = await Promise.all([
+                                supabase
+                                        .from('profiles')
+                                        .select('email')
+                                        .eq('id', studentId)
+                                        .single(),
+                                supabase
+                                        .from('courses')
+                                        .select('title')
+                                        .eq('id', courseId)
+                                        .single(),
+                        ]);
+
+                        if (student?.email && match.slot_start_at && match.slot_end_at) {
+                                const slotStart = new Date(match.slot_start_at);
+                                const slotEnd = new Date(match.slot_end_at);
+                                const timeText = `${slotStart.toLocaleString('ko-KR')} ~ ${slotEnd.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`;
+                                const courseTitle = course?.title ?? '수업';
+                                await sendEmail({
+                                        to: student.email,
+                                        subject: `[린스쿨] 수업 일정이 확정되었습니다: ${courseTitle}`,
+                                        text: `수업 일정이 확정되었습니다.\n수업명: ${courseTitle}\n시간: ${timeText}\n담당 강사: ${match.instructor_name ?? '미지정'}`,
+                                });
+                        }
+                } catch (error) {
+                        console.error('확정 일정 학생 추가 이메일 발송 실패', error);
+                }
+        }
 
 	revalidatePath(`/admin/courses/${courseId}`);
 }
